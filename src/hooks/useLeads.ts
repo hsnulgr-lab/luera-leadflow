@@ -150,7 +150,7 @@ export const useLeads = () => {
             await addNotification(
                 'success',
                 'Arama Tamamlandı',
-                `${config.sektor} sektöründe ${config.city} bölgesinde ${leadCount} yeni lead bulundu.`
+                `${config.sector} sektöründe ${config.city} bölgesinde ${leadCount} yeni lead bulundu.`
             );
         } catch (error) {
             console.error("Search failed:", error);
@@ -160,7 +160,7 @@ export const useLeads = () => {
             await addNotification(
                 'error',
                 'Arama Hatası',
-                `${config.sektor} araması sırasında hata oluştu: ${errorMsg}`
+                `${config.sector} araması sırasında hata oluştu: ${errorMsg}`
             );
         } finally {
             setIsSearching(false);

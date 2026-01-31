@@ -1,5 +1,5 @@
 
-import { OpenAI } from "openai";
+// OpenAI import removed to fix build error
 
 // Client-side AI service using direct API call (for demo purposes)
 // In production, this should be done via a backend proxy to hide the API key
