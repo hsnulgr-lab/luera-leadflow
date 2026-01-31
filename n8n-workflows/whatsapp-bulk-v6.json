@@ -1,0 +1,312 @@
+{
+    "name": "WhatsApp - Toplu Gönderim V6 (No-Block Loop)",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "whatsapp-bulk-v6",
+                "responseMode": "responseNode",
+                "options": {
+                    "responseHeaders": {
+                        "entries": [
+                            {
+                                "name": "Access-Control-Allow-Origin",
+                                "value": "*"
+                            },
+                            {
+                                "name": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ]
+                    }
+                }
+            },
+            "id": "webhook-v6",
+            "name": "Webhook V6",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 2.1,
+            "position": [
+                2000,
+                1080
+            ],
+            "webhookId": "whatsapp-bulk-v6"
+        },
+        {
+            "parameters": {
+                "respondWith": "json",
+                "responseBody": "={\n  \"success\": true,\n  \"message\": \"V6 Başlatıldı\",\n  \"total_leads\": {{ $json.body.leads.length }},\n  \"timestamp\": \"{{ $now.toISO() }}\"\n}",
+                "options": {}
+            },
+            "id": "respond-v6",
+            "name": "Hızlı Yanıt",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1.5,
+            "position": [
+                2220,
+                940
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const body = $input.first().json.body;\nconst leads = body.leads || [];\nconst messageTemplate = body.message || '';\n\nconst items = leads.map((lead, index) => {\n  let phone = (lead.phone || lead.phoneNumber || '').toString().replace(/\\D/g, '');\n  if (phone.startsWith('0')) phone = '90' + phone.substring(1);\n  else if (!phone.startsWith('90') && phone.length === 10) phone = '90' + phone;\n\n  let finalMessage = lead.message || messageTemplate;\n  if (lead.companyName) {\n    finalMessage = finalMessage.replace('{companyName}', lead.companyName);\n  }\n  \n  return {\n    json: {\n      phone: phone,\n      message: finalMessage,\n      companyName: lead.companyName || '',\n      index: index + 1,\n      total: leads.length\n    }\n  };\n});\n\nreturn items;"
+            },
+            "id": "format-v6",
+            "name": "Lead Formatla",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                2220,
+                1200
+            ]
+        },
+        {
+            "parameters": {
+                "batchSize": 1,
+                "options": {
+                    "reset": false
+                }
+            },
+            "id": "loop-v6",
+            "name": "Tek Tek Gönder",
+            "type": "n8n-nodes-base.splitInBatches",
+            "typeVersion": 3,
+            "position": [
+                2440,
+                1200
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://evolotion2.lueratech.com/message/sendText/testwp",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "apikey",
+                            "value": "D185530EADF4-4A27-B8FC-FAF0ADB6BF67"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\n  \"number\": \"{{ $json.phone }}\",\n  \"text\": {{ JSON.stringify($json.message) }}\n}",
+                "options": {
+                    "timeout": 30000
+                }
+            },
+            "id": "api-v6",
+            "name": "WhatsApp Gönder",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                2660,
+                1200
+            ],
+            "onError": "continueRegularOutput"
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": "",
+                        "typeValidation": "strict"
+                    },
+                    "conditions": [
+                        {
+                            "id": "success-check",
+                            "leftValue": "={{ $json.statusCode }}",
+                            "rightValue": 200,
+                            "operator": {
+                                "type": "number",
+                                "operation": "equals"
+                            }
+                        }
+                    ],
+                    "combinator": "and"
+                },
+                "options": {}
+            },
+            "id": "check-v6",
+            "name": "Başarılı mı?",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2,
+            "position": [
+                2880,
+                1200
+            ]
+        },
+        {
+            "parameters": {
+                "amount": 10,
+                "unit": "seconds"
+            },
+            "id": "wait-success-v6",
+            "name": "Bekle (10s)",
+            "type": "n8n-nodes-base.wait",
+            "typeVersion": 1.1,
+            "position": [
+                3100,
+                1100
+            ]
+        },
+        {
+            "parameters": {
+                "amount": 5,
+                "unit": "seconds"
+            },
+            "id": "wait-error-v6",
+            "name": "Bekle (5s) [Hata]",
+            "type": "n8n-nodes-base.wait",
+            "typeVersion": 1.1,
+            "position": [
+                3100,
+                1320
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "console.log(`✅ Mesaj OK: ${$json.phone}`);\nreturn [$input.first()];"
+            },
+            "id": "log-success-v6",
+            "name": "Log Success",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                3300,
+                1100
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "console.log(`❌ Mesaj Fail: ${$json.phone}`);\nreturn [$input.first()];"
+            },
+            "id": "log-error-v6",
+            "name": "Log Error",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                3300,
+                1320
+            ]
+        }
+    ],
+    "connections": {
+        "Webhook V6": {
+            "main": [
+                [
+                    {
+                        "node": "Hızlı Yanıt",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "Lead Formatla",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Lead Formatla": {
+            "main": [
+                [
+                    {
+                        "node": "Tek Tek Gönder",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Tek Tek Gönder": {
+            "main": [
+                [
+                    {
+                        "node": "WhatsApp Gönder",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "WhatsApp Gönder": {
+            "main": [
+                [
+                    {
+                        "node": "Başarılı mı?",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Başarılı mı?": {
+            "main": [
+                [
+                    {
+                        "node": "Bekle (10s)",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Bekle (5s) [Hata]",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Bekle (10s)": {
+            "main": [
+                [
+                    {
+                        "node": "Log Success",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Bekle (5s) [Hata]": {
+            "main": [
+                [
+                    {
+                        "node": "Log Error",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Log Success": {
+            "main": [
+                [
+                    {
+                        "node": "Tek Tek Gönder",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Log Error": {
+            "main": [
+                [
+                    {
+                        "node": "Tek Tek Gönder",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}

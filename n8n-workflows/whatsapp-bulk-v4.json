@@ -1,0 +1,346 @@
+{
+    "name": "WhatsApp - Toplu Gönderim V4 (Final Robust)",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "whatsapp-bulk-v4",
+                "responseMode": "responseNode",
+                "options": {
+                    "responseHeaders": {
+                        "entries": [
+                            {
+                                "name": "Access-Control-Allow-Origin",
+                                "value": "*"
+                            },
+                            {
+                                "name": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ]
+                    }
+                }
+            },
+            "id": "4ad94425-dfba-4590-9b6b-e32dbdc795e0",
+            "name": "Webhook",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 2.1,
+            "position": [
+                1984,
+                1072
+            ],
+            "webhookId": "whatsapp-bulk-v4"
+        },
+        {
+            "parameters": {
+                "respondWith": "json",
+                "responseBody": "={\n  \"success\": true,\n  \"message\": \"WhatsApp mesajları gönderiliyor\",\n  \"total_leads\": {{ $json.body.leads.length }},\n  \"timestamp\": \"{{ $now.toISO() }}\"\n}",
+                "options": {}
+            },
+            "id": "860ee073-a642-4f21-be91-c11ead41d294",
+            "name": "Hızlı Yanıt",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1.5,
+            "position": [
+                2192,
+                944
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "// Gelen veriyi al\nconst body = $input.first().json.body;\nconst leads = body.leads || [];\nconst messageTemplate = body.message || '';\n\n// Her lead için ayrı item oluştur\nconst items = leads.map((lead, index) => {\n  // Telefon numarasını temizle ve formatla\n  let phone = (lead.phone || lead.phoneNumber || '').toString().replace(/\\D/g, '');\n  \n  // Türkiye formatına çevir\n  if (phone.startsWith('0')) {\n    phone = '90' + phone.substring(1);\n  } else if (!phone.startsWith('90') && phone.length === 10) {\n    phone = '90' + phone;\n  }\n  \n  // Mesajı belirle (lead'e özel mesaj varsa onu kullan, yoksa template'i kullan)\n  const message = lead.message || messageTemplate;\n  \n  // Şirket adı varsa mesaja ekle\n  let finalMessage = message;\n  if (lead.companyName) {\n    finalMessage = message.replace('{companyName}', lead.companyName);\n  }\n  \n  return {\n    json: {\n      phone: phone,\n      message: finalMessage,\n      companyName: lead.companyName || '',\n      index: index + 1,\n      total: leads.length\n    }\n  };\n});\n\nreturn items;"
+            },
+            "id": "4fa4b560-6be5-4f35-85ce-775d41b29f3c",
+            "name": "Lead Formatla",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                2192,
+                1152
+            ]
+        },
+        {
+            "parameters": {
+                "options": {}
+            },
+            "id": "4989579a-7f91-4bed-ad3e-a9ab4fa4792b",
+            "name": "Tek Tek Gönder",
+            "type": "n8n-nodes-base.splitInBatches",
+            "typeVersion": 3,
+            "position": [
+                2416,
+                1152
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://evolotion2.lueratech.com/message/sendText/testwp",
+                "authentication": "predefinedCredentialType",
+                "nodeCredentialType": "httpHeaderAuth",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "apikey",
+                            "value": "D185530EADF4-4A27-B8FC-FAF0ADB6BF67"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\n  \"number\": \"{{ $json.phone }}\",\n  \"text\": {{ JSON.stringify($json.message) }}\n}",
+                "options": {
+                    "timeout": 30000
+                }
+            },
+            "id": "3c09ec2b-9a79-491f-a959-64a53583cb39",
+            "name": "WhatsApp Mesaj Gönder",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                2640,
+                1152
+            ],
+            "credentials": {
+                "httpHeaderAuth": {
+                    "id": "KyRWKPTqDKgpHwf9",
+                    "name": "Header Auth account"
+                }
+            },
+            "continueOnFail": true,
+            "onError": "continueRegularOutput"
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": "",
+                        "typeValidation": "strict"
+                    },
+                    "conditions": [
+                        {
+                            "id": "success-condition",
+                            "leftValue": "={{ $json.statusCode }}",
+                            "rightValue": 200,
+                            "operator": {
+                                "type": "number",
+                                "operation": "equals"
+                            }
+                        }
+                    ],
+                    "combinator": "and"
+                },
+                "options": {}
+            },
+            "id": "5f925d9f-e1d2-43cd-9013-31d00d481ca5",
+            "name": "Kontrol Et",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2,
+            "position": [
+                2864,
+                1152
+            ]
+        },
+        {
+            "parameters": {
+                "amount": 10
+            },
+            "id": "7e3a7156-b3c3-4af3-8c36-83fa6db4951f",
+            "name": "Bekle (10sn)",
+            "type": "n8n-nodes-base.wait",
+            "typeVersion": 1.1,
+            "position": [
+                3072,
+                1056
+            ],
+            "webhookId": "wait-webhook-success"
+        },
+        {
+            "parameters": {},
+            "id": "0fdff9aa-74b8-48e5-a0a8-b9367707cd13",
+            "name": "Bekle (5sn) - Hata",
+            "type": "n8n-nodes-base.wait",
+            "typeVersion": 1.1,
+            "position": [
+                3072,
+                1248
+            ],
+            "webhookId": "wait-webhook-error"
+        },
+        {
+            "parameters": {
+                "jsCode": "// Log success\nconst currentItem = $input.first().json;\nconsole.log(`✅ Mesaj gönderildi: ${currentItem.phone} (${currentItem.index}/${currentItem.total})`);\nreturn [$input.first()];"
+            },
+            "id": "5c50b46c-38eb-45e9-971e-5690e6b1fe85",
+            "name": "Başarı Logu",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                3296,
+                1056
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "// Log error\nconst currentItem = $input.first().json;\nconsole.log(`❌ Hata: ${currentItem.phone} (${currentItem.index}/${currentItem.total})`);\nreturn [$input.first()];"
+            },
+            "id": "8975bd90-aa8a-40ef-9c73-5f5c95706c1a",
+            "name": "Hata Logu",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                3296,
+                1248
+            ]
+        },
+        {
+            "parameters": {
+                "mode": "combine",
+                "combineBy": "combineAll",
+                "options": {}
+            },
+            "id": "c3315273-4333-413a-858d-407dbc9ab568",
+            "name": "Birleştir",
+            "type": "n8n-nodes-base.merge",
+            "typeVersion": 3,
+            "position": [
+                3520,
+                1152
+            ]
+        }
+    ],
+    "connections": {
+        "Webhook": {
+            "main": [
+                [
+                    {
+                        "node": "Hızlı Yanıt",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "Lead Formatla",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Lead Formatla": {
+            "main": [
+                [
+                    {
+                        "node": "Tek Tek Gönder",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Tek Tek Gönder": {
+            "main": [
+                [
+                    {
+                        "node": "WhatsApp Mesaj Gönder",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "WhatsApp Mesaj Gönder": {
+            "main": [
+                [
+                    {
+                        "node": "Kontrol Et",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Kontrol Et": {
+            "main": [
+                [
+                    {
+                        "node": "Bekle (10sn)",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Bekle (5sn) - Hata",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Bekle (10sn)": {
+            "main": [
+                [
+                    {
+                        "node": "Başarı Logu",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Bekle (5sn) - Hata": {
+            "main": [
+                [
+                    {
+                        "node": "Hata Logu",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Başarı Logu": {
+            "main": [
+                [
+                    {
+                        "node": "Birleştir",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Hata Logu": {
+            "main": [
+                [
+                    {
+                        "node": "Birleştir",
+                        "type": "main",
+                        "index": 1
+                    }
+                ]
+            ]
+        },
+        "Birleştir": {
+            "main": [
+                [
+                    {
+                        "node": "Tek Tek Gönder",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "pinData": {},
+    "meta": {
+        "instanceId": "cdff0445899da88f2bd87cd11999f662983047f1a677170d82f62cebe2eb3755"
+    }
+}

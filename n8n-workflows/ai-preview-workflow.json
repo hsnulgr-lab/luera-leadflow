@@ -1,0 +1,101 @@
+{
+    "name": "WhatsApp - AI Preview (Single)",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "whatsapp-ai-preview",
+                "responseMode": "responseNode",
+                "options": {
+                    "responseHeaders": {
+                        "entries": [
+                            {
+                                "name": "Access-Control-Allow-Origin",
+                                "value": "*"
+                            }
+                        ]
+                    }
+                }
+            },
+            "id": "webhook-preview",
+            "name": "Webhook - AI Preview",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 2.1,
+            "position": [
+                120,
+                300
+            ],
+            "webhookId": "whatsapp-ai-preview"
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://api.groq.com/openai/v1/chat/completions",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Authorization",
+                            "value": "Bearer YOUR_GROQ_API_KEY"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\n  \"model\": \"llama-3.3-70b-versatile\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Sen dünyanın en iyi B2B Soğuk Satış (Cold Outreach) Metin Yazarısın. Sıradan, yapay zeka tarafından yazıldığı belli olan mesajlardan NEFRET EDERSİN.\\n\\nGÖREVİN: LUERA markası adına potansiyel müşteriye, onları gerçekten araştırdığını hissettiren ve sonunda NET BİR GÖRÜŞME TEKLİFİ içeren 3 cümlelik bir WhatsApp giriş mesajı yazmak.\\n\\nKATI KURALLAR (HATA YAPMA):\\n1. **Giriş Yasakları:** 'Merhaba', 'Selamlar', 'Sayın Yetkili', 'Umarım gününüz iyi geçiyordur' gibi kelimelerle başlama. Bunlar çöp.\\n2. **Direkt Konuya Gir:** Sanki müşteriyi tanıyormuş gibi, doğrudan bir tespit veya fırsatla başla.\\n3. **Müşteri Odaklı Ol:** 'Biz şunu yapıyoruz' DEME. 'Sizin şu potansiyelinizi gördüm' DE.\\n4. **GÖRÜŞME TEKLİFİ (ZORUNLU):** Mesajın sonu MUTLAKA bir görüşme veya tanışma daveti ile bitmeli. Ancak bu davet 'satış' gibi değil, 'fikir alışverişi' gibi durmalı.\\n5. **Kısa Tut:** Maksimum 40 kelime.\\n\\nŞABLONLAR (Bunladan esinlen ama kopyalama):\\n- '{{ $json.body.companyName }} web sitenizdeki [ilgili alan] dikkatimi çekti... Bu konuda geliştirdiğimiz stratejiyi paylaşmak için kısa bir tanışma toplantısı yapabilir miyiz?'\\n- 'Sektördeki rakipleriniz X yaparken, {{ $json.body.companyName }} için farklı bir büyüme fırsatı görüyorum. Müsait olduğunuzda 10 dk fikir alışverişi yapmak isterim.'\\n\\nHEDEF:\\nMesajı okuyan kişi şunu demeli: 'Bu kişi dersine çalışmış, bir 10 dakika ayırıp dinlemeye değer.'\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"{{ $json.body.companyName }} şirketi için {{ $json.body.offerType }} konulu, klişelerden uzak, sonunda mutlaka nazik bir görüşme teklifi olan zeki bir giriş mesajı yaz. Sadece mesajı ver.\"\n    }\n  ],\n  \"temperature\": 0.8,\n  \"max_tokens\": 150\n}",
+                "options": {}
+            },
+            "id": "groq-ai-preview",
+            "name": "Groq AI (DeepSeek R1) - Önizleme",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                340,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "respondWith": "json",
+                "responseBody": "={\n  \"message\": {{ JSON.stringify($json.choices[0].message.content.trim()) }},\n  \"success\": true\n}",
+                "options": {}
+            },
+            "id": "respond-preview",
+            "name": "Yanıtla",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1.5,
+            "position": [
+                560,
+                300
+            ]
+        }
+    ],
+    "connections": {
+        "Webhook - AI Preview": {
+            "main": [
+                [
+                    {
+                        "node": "Groq AI (DeepSeek R1) - Önizleme",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Groq AI (DeepSeek R1) - Önizleme": {
+            "main": [
+                [
+                    {
+                        "node": "Yanıtla",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}

@@ -1,0 +1,190 @@
+{
+    "name": "WhatsApp - Toplu Gönderim V3 (Reliable)",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "whatsapp-bulk-v3",
+                "responseMode": "responseNode",
+                "options": {
+                    "responseHeaders": {
+                        "entries": [
+                            {
+                                "name": "Access-Control-Allow-Origin",
+                                "value": "*"
+                            }
+                        ]
+                    }
+                }
+            },
+            "id": "webhook-v3",
+            "name": "Webhook V3",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 2.1,
+            "position": [
+                -380,
+                240
+            ],
+            "webhookId": "whatsapp-bulk-v3"
+        },
+        {
+            "parameters": {
+                "respondWith": "json",
+                "responseBody": "={\n  \"success\": true,\n  \"message\": \"V3 Kuyruğu Başlatıldı\",\n  \"count\": {{ $json.body.leads.length }}\n}",
+                "options": {}
+            },
+            "id": "respond-v3",
+            "name": "Hızlı Yanıt",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1.5,
+            "position": [
+                -160,
+                240
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const leads = $input.first().json.body.leads || [];\nconst messageTemplate = $input.first().json.body.message || '';\n\nreturn leads.map(lead => {\n  let phone = (lead.phone || lead.phoneNumber || '').replace(/\\D/g, '');\n  if (phone.startsWith('0')) phone = '90' + phone.substring(1);\n  else if (!phone.startsWith('90') && phone.length === 10) phone = '90' + phone;\n\n  return {\n    json: {\n      phone,\n      message: lead.message || messageTemplate,\n      companyName: lead.companyName || ''\n    }\n  };\n});"
+            },
+            "id": "format-v3",
+            "name": "Format Leads",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                60,
+                240
+            ]
+        },
+        {
+            "parameters": {
+                "batchSize": 1,
+                "options": {
+                    "reset": true
+                }
+            },
+            "id": "loop-v3",
+            "name": "Loop",
+            "type": "n8n-nodes-base.splitInBatches",
+            "typeVersion": 3,
+            "position": [
+                280,
+                240
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://evolotion2.lueratech.com/message/sendText/testwp",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "apikey",
+                            "value": "D185530EADF4-4A27-B8FC-FAF0ADB6BF67"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\n  \"number\": \"{{ $json.phone }}\",\n  \"text\": {{ JSON.stringify($json.message) }}\n}",
+                "options": {}
+            },
+            "id": "api-v3",
+            "name": "Send API",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                500,
+                240
+            ],
+            "onError": "continueRegularOutput"
+        },
+        {
+            "parameters": {
+                "amount": 10,
+                "unit": "seconds"
+            },
+            "id": "wait-v3",
+            "name": "Wait (10s)",
+            "type": "n8n-nodes-base.wait",
+            "typeVersion": 1.1,
+            "position": [
+                720,
+                240
+            ],
+            "onError": "continueRegularOutput"
+        }
+    ],
+    "connections": {
+        "Webhook V3": {
+            "main": [
+                [
+                    {
+                        "node": "Hızlı Yanıt",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Hızlı Yanıt": {
+            "main": [
+                [
+                    {
+                        "node": "Format Leads",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Format Leads": {
+            "main": [
+                [
+                    {
+                        "node": "Loop",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Loop": {
+            "main": [
+                [
+                    {
+                        "node": "Send API",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Send API": {
+            "main": [
+                [
+                    {
+                        "node": "Wait (10s)",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Wait (10s)": {
+            "main": [
+                [
+                    {
+                        "node": "Loop",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}

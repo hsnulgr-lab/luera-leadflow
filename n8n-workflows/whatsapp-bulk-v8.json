@@ -1,0 +1,188 @@
+{
+    "name": "WhatsApp - Toplu Gönderim V8 (Random Delay 20-85s)",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "whatsapp-bulk-v8",
+                "responseMode": "responseNode",
+                "options": {
+                    "responseHeaders": {
+                        "entries": [
+                            {
+                                "name": "Access-Control-Allow-Origin",
+                                "value": "*"
+                            },
+                            {
+                                "name": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ]
+                    }
+                }
+            },
+            "id": "webhook-v8",
+            "name": "Webhook V8",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 2.1,
+            "position": [
+                -380,
+                240
+            ],
+            "webhookId": "whatsapp-bulk-v8"
+        },
+        {
+            "parameters": {
+                "respondWith": "json",
+                "responseBody": "={\n  \"success\": true,\n  \"message\": \"V8 Başlatıldı (20-85sn Aralıklı)\",\n  \"total_leads\": {{ $json.body.leads.length }},\n  \"timestamp\": \"{{ $now.toISO() }}\"\n}",
+                "options": {}
+            },
+            "id": "respond-v8",
+            "name": "Hızlı Yanıt",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1.5,
+            "position": [
+                -160,
+                100
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const body = $input.first().json.body;\nconst leads = body.leads || [];\nconst messageTemplate = body.message || '';\n\nconst items = leads.map((lead, index) => {\n  // 1. Telefon Formatla\n  let phone = (lead.phone || lead.phoneNumber || '').toString().replace(/\\D/g, '');\n  if (phone.startsWith('0')) phone = '90' + phone.substring(1);\n  else if (!phone.startsWith('90') && phone.length === 10) phone = '90' + phone;\n\n  // 2. Mesaj Formatla\n  let finalMessage = lead.message || messageTemplate;\n  if (lead.companyName) {\n    finalMessage = finalMessage.replace('{companyName}', lead.companyName);\n  }\n  \n  // 3. Rastgele Bekleme Süresi Hesapla (20 ile 85 saniye arası)\n  // Math.random() * (max - min + 1) + min\n  const randomDelay = Math.floor(Math.random() * (85 - 20 + 1) + 20);\n\n  return {\n    json: {\n      phone: phone,\n      message: finalMessage,\n      companyName: lead.companyName || '',\n      index: index + 1,\n      total: leads.length,\n      delaySeconds: randomDelay\n    }\n  };\n});\n\nreturn items;"
+            },
+            "id": "format-v8",
+            "name": "Hazırlık (Random Time)",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                -160,
+                400
+            ]
+        },
+        {
+            "parameters": {
+                "batchSize": 1,
+                "options": {}
+            },
+            "id": "loop-v8",
+            "name": "Sıralı İşlem",
+            "type": "n8n-nodes-base.splitInBatches",
+            "typeVersion": 3,
+            "position": [
+                100,
+                400
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://evolotion2.lueratech.com/message/sendText/testwp",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "apikey",
+                            "value": "D185530EADF4-4A27-B8FC-FAF0ADB6BF67"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\n  \"number\": \"{{ $json.phone }}\",\n  \"text\": {{ JSON.stringify($json.message) }}\n}",
+                "options": {
+                    "timeout": 30000
+                }
+            },
+            "id": "api-v8",
+            "name": "WhatsApp Gönder",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                340,
+                400
+            ],
+            "onError": "continueRegularOutput"
+        },
+        {
+            "parameters": {
+                "amount": "={{ $json.delaySeconds }}",
+                "unit": "seconds"
+            },
+            "id": "wait-v8",
+            "name": "Rastgele Bekle",
+            "type": "n8n-nodes-base.wait",
+            "typeVersion": 1.1,
+            "position": [
+                580,
+                400
+            ],
+            "webhookId": "wait-webhook-v8"
+        }
+    ],
+    "connections": {
+        "Webhook V8": {
+            "main": [
+                [
+                    {
+                        "node": "Hızlı Yanıt",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "Hazırlık (Random Time)",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Hazırlık (Random Time)": {
+            "main": [
+                [
+                    {
+                        "node": "Sıralı İşlem",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Sıralı İşlem": {
+            "main": [
+                [
+                    {
+                        "node": "WhatsApp Gönder",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "WhatsApp Gönder": {
+            "main": [
+                [
+                    {
+                        "node": "Rastgele Bekle",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Rastgele Bekle": {
+            "main": [
+                [
+                    {
+                        "node": "Sıralı İşlem",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}

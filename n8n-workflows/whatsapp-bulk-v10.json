@@ -1,0 +1,240 @@
+{
+    "name": "WhatsApp - Toplu Gönderim V10 (Proven Logic)",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "whatsapp-bulk-v10",
+                "responseMode": "responseNode",
+                "options": {
+                    "responseHeaders": {
+                        "entries": [
+                            {
+                                "name": "Access-Control-Allow-Origin",
+                                "value": "*"
+                            }
+                        ]
+                    }
+                }
+            },
+            "id": "webhook-v10",
+            "name": "Webhook V10",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 2.1,
+            "position": [
+                -656,
+                128
+            ],
+            "webhookId": "whatsapp-bulk-v10"
+        },
+        {
+            "parameters": {
+                "jsCode": "const leads = $input.first().json.body.leads || [];\nconst messageTemplate = $input.first().json.body.message || '';\n\nconst formattedLeads = leads.map(lead => {\n  let phone = (lead.phone || lead.phoneNumber || '').replace(/\\D/g, '');\n  \n  // Handle Turkish phone numbers\n  if (phone.startsWith('0')) {\n    phone = '90' + phone.substring(1);\n  } else if (!phone.startsWith('90') && phone.length === 10) {\n    phone = '90' + phone;\n  }\n  \n  // Replace placeholders in message\n  let message = messageTemplate\n    .replace(/{{Company Name}}/gi, lead.companyName || '')\n    .replace(/{{Company Category}}/gi, lead.companyCategory || '')\n    .replace(/{{companyName}}/gi, lead.companyName || '')\n    .replace(/{{companyCategory}}/gi, lead.companyCategory || '');\n  \n  return {\n    phone,\n    message,\n    companyName: lead.companyName || '',\n    companyCategory: lead.companyCategory || '',\n    originalPhone: lead.phone || lead.phoneNumber\n  };\n});\n\nreturn formattedLeads.map(lead => ({ json: lead }));"
+            },
+            "id": "format-v10",
+            "name": "Format Leads",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                -448,
+                128
+            ]
+        },
+        {
+            "parameters": {
+                "options": {
+                    "reset": false
+                }
+            },
+            "id": "loop-v10",
+            "name": "Her Lead İçin Döngü",
+            "type": "n8n-nodes-base.splitInBatches",
+            "typeVersion": 3,
+            "position": [
+                -224,
+                128
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://evolotion2.lueratech.com/message/sendText/testwp",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "apikey",
+                            "value": "D185530EADF4-4A27-B8FC-FAF0ADB6BF67"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\n  \"number\": \"{{ $json.phone }}\",\n  \"text\": {{ JSON.stringify($json.message) }}\n}",
+                "options": {
+                    "response": {
+                        "response": {
+                            "fullResponse": true
+                        }
+                    }
+                }
+            },
+            "id": "api-v10",
+            "name": "Evolution API - Mesaj Gönder",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                0,
+                224
+            ],
+            "alwaysOutputData": true,
+            "onError": "continueRegularOutput"
+        },
+        {
+            "parameters": {
+                "jsCode": "const currentItem = $input.first().json;\nconst statusCode = currentItem.statusCode || 0;\nconst success = statusCode === 201;\n\nconst result = {\n  phone: $('Her Lead İçin Döngü').item.json.phone,\n  companyName: $('Her Lead İçin Döngü').item.json.companyName,\n  success,\n  messageId: success ? (currentItem.body?.key?.id || 'sent') : null,\n  error: success ? null : (currentItem.body?.message || 'Gönderim hatası')\n};\n\nreturn { json: result };"
+            },
+            "id": "code-v10",
+            "name": "Sonuç Kaydet",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                224,
+                224
+            ]
+        },
+        {
+            "parameters": {
+                "amount": "={{ Math.floor(Math.random() * 46) + 30 }}"
+            },
+            "id": "wait-v10",
+            "name": "Rastgele Bekleme (30-75sn)",
+            "type": "n8n-nodes-base.wait",
+            "typeVersion": 1.1,
+            "position": [
+                448,
+                224
+            ],
+            "webhookId": "bulk-wait-v10"
+        },
+        {
+            "parameters": {
+                "aggregate": "aggregateAllItemData",
+                "options": {}
+            },
+            "id": "aggregate-v10",
+            "name": "Sonuçları Birleştir",
+            "type": "n8n-nodes-base.aggregate",
+            "typeVersion": 1,
+            "position": [
+                0,
+                0
+            ]
+        },
+        {
+            "parameters": {
+                "respondWith": "json",
+                "responseBody": "={\n  \"success\": true,\n  \"message\": \"Toplu gönderim tamamlandı\",\n  \"totalSent\": {{ $json.data.length }},\n  \"successful\": {{ $json.data.filter(r => r.success).length }},\n  \"failed\": {{ $json.data.filter(r => !r.success).length }},\n  \"results\": {{ JSON.stringify($json.data) }}\n}",
+                "options": {}
+            },
+            "id": "respond-v10",
+            "name": "Toplu Sonuç Yanıtı",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1.5,
+            "position": [
+                224,
+                0
+            ]
+        }
+    ],
+    "connections": {
+        "Webhook V10": {
+            "main": [
+                [
+                    {
+                        "node": "Format Leads",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Format Leads": {
+            "main": [
+                [
+                    {
+                        "node": "Her Lead İçin Döngü",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Her Lead İçin Döngü": {
+            "main": [
+                [
+                    {
+                        "node": "Sonuçları Birleştir",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Evolution API - Mesaj Gönder",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Evolution API - Mesaj Gönder": {
+            "main": [
+                [
+                    {
+                        "node": "Sonuç Kaydet",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Sonuç Kaydet": {
+            "main": [
+                [
+                    {
+                        "node": "Rastgele Bekleme (30-75sn)",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Rastgele Bekleme (30-75sn)": {
+            "main": [
+                [
+                    {
+                        "node": "Her Lead İçin Döngü",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Sonuçları Birleştir": {
+            "main": [
+                [
+                    {
+                        "node": "Toplu Sonuç Yanıtı",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}

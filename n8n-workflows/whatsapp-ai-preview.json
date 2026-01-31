@@ -1,0 +1,131 @@
+{
+    "name": "WhatsApp - AI Mesaj Önizleme",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "whatsapp-ai-preview",
+                "responseMode": "responseNode",
+                "options": {
+                    "responseHeaders": {
+                        "entries": [
+                            {
+                                "name": "Access-Control-Allow-Origin",
+                                "value": "*"
+                            },
+                            {
+                                "name": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ]
+                    }
+                }
+            },
+            "id": "webhook-ai",
+            "name": "Webhook",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 2.1,
+            "position": [
+                -100,
+                240
+            ],
+            "webhookId": "whatsapp-ai-preview"
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://api.groq.com/openai/v1/chat/completions",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Authorization",
+                            "value": "Bearer YOUR_GROQ_API_KEY"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\n  \"model\": \"llama-3.3-70b-versatile\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Sen LUERA şirketi için profesyonel WhatsApp satış mesajları yazan bir asistansın. Mesajlar kısa, samimi ve ikna edici olmalı. Her mesaj benzersiz olmalı - aynı template'i kullanma. Maksimum 3 cümle. Emoji kullan ama abartma. Türkçe yaz.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"{{ $json.body.companyName }} isimli şirket için {{ $json.body.offerType }} konusunda kişiselleştirilmiş bir WhatsApp satış mesajı yaz. Şirket adını kullan ve sektöre uygun özellikler vurgula.\"\n    }\n  ],\n  \"temperature\": 0.9,\n  \"max_tokens\": 200\n}",
+                "options": {
+                    "timeout": 30000
+                }
+            },
+            "id": "ai-request",
+            "name": "Groq AI",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                140,
+                240
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const response = $input.first().json;\n\n// Extract the AI-generated message\nlet message = 'Mesaj oluşturulamadı.';\n\ntry {\n  if (response.choices && response.choices[0] && response.choices[0].message) {\n    message = response.choices[0].message.content.trim();\n  }\n} catch (e) {\n  console.error('Parse error:', e);\n}\n\nreturn [{ json: { message } }];"
+            },
+            "id": "parse-response",
+            "name": "Parse Response",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                380,
+                240
+            ]
+        },
+        {
+            "parameters": {
+                "respondWith": "json",
+                "responseBody": "={{ JSON.stringify($json) }}",
+                "options": {}
+            },
+            "id": "respond",
+            "name": "Respond",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1.5,
+            "position": [
+                620,
+                240
+            ]
+        }
+    ],
+    "connections": {
+        "Webhook": {
+            "main": [
+                [
+                    {
+                        "node": "Groq AI",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Groq AI": {
+            "main": [
+                [
+                    {
+                        "node": "Parse Response",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Parse Response": {
+            "main": [
+                [
+                    {
+                        "node": "Respond",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}

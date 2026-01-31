@@ -1,0 +1,213 @@
+{
+    "name": "WhatsApp - Toplu Gönderim V9 (Item Lists Fix)",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "whatsapp-bulk-v9",
+                "responseMode": "responseNode",
+                "options": {
+                    "responseHeaders": {
+                        "entries": [
+                            {
+                                "name": "Access-Control-Allow-Origin",
+                                "value": "*"
+                            },
+                            {
+                                "name": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ]
+                    }
+                }
+            },
+            "id": "webhook-v9",
+            "name": "Webhook V9",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 2.1,
+            "position": [
+                -440,
+                240
+            ],
+            "webhookId": "whatsapp-bulk-v9"
+        },
+        {
+            "parameters": {
+                "respondWith": "json",
+                "responseBody": "={\n  \"success\": true,\n  \"message\": \"V9 Başlatıldı (Item Lists)\",\n  \"total_leads\": {{ $json.body.leads.length }},\n  \"timestamp\": \"{{ $now.toISO() }}\"\n}",
+                "options": {}
+            },
+            "id": "respond-v9",
+            "name": "Hızlı Yanıt",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1.5,
+            "position": [
+                -200,
+                100
+            ]
+        },
+        {
+            "parameters": {
+                "fieldToSplitOut": "body.leads",
+                "options": {}
+            },
+            "id": "item-lists-v9",
+            "name": "Listeyi Ayır (Split)",
+            "type": "n8n-nodes-base.itemLists",
+            "typeVersion": 1,
+            "position": [
+                -200,
+                400
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const lead = $input.item.json;\nconst body = $('Webhook V9').item.json.body;\nconst messageTemplate = body.message || '';\n\n// 1. Telefon Formatla\nlet phone = (lead.phone || lead.phoneNumber || '').toString().replace(/\\D/g, '');\nif (phone.startsWith('0')) phone = '90' + phone.substring(1);\nelse if (!phone.startsWith('90') && phone.length === 10) phone = '90' + phone;\n\n// 2. Mesaj Formatla\nlet finalMessage = lead.message || messageTemplate;\nif (lead.companyName) {\n  finalMessage = finalMessage.replace('{companyName}', lead.companyName);\n}\n\n// 3. Random Delay (20-85sn)\nconst randomDelay = Math.floor(Math.random() * (85 - 20 + 1) + 20);\n\nreturn {\n  json: {\n    phone,\n    message: finalMessage,\n    companyName: lead.companyName,\n    delaySeconds: randomDelay\n  }\n};"
+            },
+            "id": "format-v9",
+            "name": "Format ve Delay",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                0,
+                400
+            ]
+        },
+        {
+            "parameters": {
+                "batchSize": 1,
+                "options": {}
+            },
+            "id": "loop-v9",
+            "name": "Sıralı Döngü",
+            "type": "n8n-nodes-base.splitInBatches",
+            "typeVersion": 3,
+            "position": [
+                220,
+                400
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://evolotion2.lueratech.com/message/sendText/testwp",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "apikey",
+                            "value": "D185530EADF4-4A27-B8FC-FAF0ADB6BF67"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\n  \"number\": \"{{ $json.phone }}\",\n  \"text\": {{ JSON.stringify($json.message) }}\n}",
+                "options": {
+                    "timeout": 30000
+                }
+            },
+            "id": "api-v9",
+            "name": "WhatsApp Gönder",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                460,
+                400
+            ],
+            "onError": "continueRegularOutput"
+        },
+        {
+            "parameters": {
+                "amount": "={{ $json.delaySeconds }}",
+                "unit": "seconds"
+            },
+            "id": "wait-v9",
+            "name": "Bekle (Dynamic)",
+            "type": "n8n-nodes-base.wait",
+            "typeVersion": 1.1,
+            "position": [
+                680,
+                400
+            ],
+            "webhookId": "wait-v9"
+        }
+    ],
+    "connections": {
+        "Webhook V9": {
+            "main": [
+                [
+                    {
+                        "node": "Hızlı Yanıt",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "Listeyi Ayır (Split)",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Listeyi Ayır (Split)": {
+            "main": [
+                [
+                    {
+                        "node": "Format ve Delay",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Format ve Delay": {
+            "main": [
+                [
+                    {
+                        "node": "Sıralı Döngü",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Sıralı Döngü": {
+            "main": [
+                [
+                    {
+                        "node": "WhatsApp Gönder",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "WhatsApp Gönder": {
+            "main": [
+                [
+                    {
+                        "node": "Bekle (Dynamic)",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Bekle (Dynamic)": {
+            "main": [
+                [
+                    {
+                        "node": "Sıralı Döngü",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}

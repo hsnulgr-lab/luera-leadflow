@@ -1,0 +1,188 @@
+{
+    "name": "WhatsApp - Toplu Gönderim Final (Clean Start)",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "whatsapp-bulk-final",
+                "responseMode": "responseNode",
+                "options": {
+                    "responseHeaders": {
+                        "entries": [
+                            {
+                                "name": "Access-Control-Allow-Origin",
+                                "value": "*"
+                            },
+                            {
+                                "name": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ]
+                    }
+                }
+            },
+            "id": "webhook-final",
+            "name": "Webhook Final",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 2.1,
+            "position": [
+                -200,
+                240
+            ],
+            "webhookId": "whatsapp-bulk-final"
+        },
+        {
+            "parameters": {
+                "respondWith": "json",
+                "responseBody": "={\n  \"success\": true,\n  \"message\": \"İşlem Başlatıldı (Final)\",\n  \"total_leads\": {{ $json.body.leads.length }},\n  \"timestamp\": \"{{ $now.toISO() }}\"\n}",
+                "options": {}
+            },
+            "id": "respond-final",
+            "name": "Hızlı Yanıt",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1.5,
+            "position": [
+                20,
+                80
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const body = $input.first().json.body;\nconst leads = body.leads || [];\n\n// Gelen her lead'i standart formata çeviriyoruz\nconst items = leads.map((lead, index) => {\n  // 1. Telefon Temizleme\n  let phone = (lead.phone || lead.phoneNumber || '').toString().replace(/\\D/g, '');\n  if (phone.startsWith('0')) phone = '90' + phone.substring(1);\n  else if (!phone.startsWith('90') && phone.length === 10) phone = '90' + phone;\n\n  // 2. Mesaj:\n  // ÖNCELİK: Lead ile birlikte gelen özel mesaj (Yapay Zeka vb.)\n  // YEDEK: Body'deki genel şablon\n  let finalMessage = lead.message || body.message || '';\n\n  return {\n    json: {\n      phone: phone,\n      message: finalMessage,\n      index: index + 1,\n      total: leads.length\n    }\n  };\n});\n\nreturn items;"
+            },
+            "id": "format-final",
+            "name": "Veri Hazırlama",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                20,
+                400
+            ]
+        },
+        {
+            "parameters": {
+                "batchSize": 1,
+                "options": {}
+            },
+            "id": "loop-final",
+            "name": "Döngü (Loop)",
+            "type": "n8n-nodes-base.splitInBatches",
+            "typeVersion": 3,
+            "position": [
+                240,
+                400
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://evolotion2.lueratech.com/message/sendText/testwp",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "apikey",
+                            "value": "D185530EADF4-4A27-B8FC-FAF0ADB6BF67"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\n  \"number\": \"{{ $json.phone }}\",\n  \"text\": {{ JSON.stringify($json.message) }}\n}",
+                "options": {
+                    "timeout": 30000
+                }
+            },
+            "id": "api-final",
+            "name": "WhatsApp Gönder",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                500,
+                400
+            ],
+            "onError": "continueRegularOutput"
+        },
+        {
+            "parameters": {
+                "amount": "={{ Math.floor(Math.random() * (75 - 10 + 1) + 10) }}",
+                "unit": "seconds"
+            },
+            "id": "wait-final",
+            "name": "Rastgele Bekle (10-75s)",
+            "type": "n8n-nodes-base.wait",
+            "typeVersion": 1.1,
+            "position": [
+                740,
+                400
+            ],
+            "webhookId": "wait-final-webhook"
+        }
+    ],
+    "connections": {
+        "Webhook Final": {
+            "main": [
+                [
+                    {
+                        "node": "Hızlı Yanıt",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "Veri Hazırlama",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Veri Hazırlama": {
+            "main": [
+                [
+                    {
+                        "node": "Döngü (Loop)",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Döngü (Loop)": {
+            "main": [
+                [
+                    {
+                        "node": "WhatsApp Gönder",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "WhatsApp Gönder": {
+            "main": [
+                [
+                    {
+                        "node": "Rastgele Bekle (10-75s)",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Rastgele Bekle (10-75s)": {
+            "main": [
+                [
+                    {
+                        "node": "Döngü (Loop)",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}

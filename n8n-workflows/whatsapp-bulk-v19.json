@@ -1,0 +1,262 @@
+{
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "whatsapp-bulk-v19",
+                "responseMode": "responseNode",
+                "options": {
+                    "responseHeaders": {
+                        "entries": [
+                            {
+                                "name": "Access-Control-Allow-Origin",
+                                "value": "*"
+                            },
+                            {
+                                "name": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ]
+                    }
+                }
+            },
+            "id": "bb6af13b-6142-4f8d-9e2b-6568386a4301",
+            "name": "Webhook V19",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 2.1,
+            "position": [
+                -144,
+                144
+            ],
+            "webhookId": "whatsapp-bulk-v19"
+        },
+        {
+            "parameters": {
+                "respondWith": "json",
+                "responseBody": "={\n  \"success\": true,\n  \"message\": \"V19 Gönderim Başlatıldı\",\n  \"total\": {{ $json.body.leads.length }}\n}",
+                "options": {}
+            },
+            "id": "8d338657-3f77-4ae9-895a-65414a0ab2ad",
+            "name": "Hızlı Yanıt",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1.5,
+            "position": [
+                80,
+                -16
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const body = $input.first().json.body;\nconst leads = body.leads || [];\n\n// Store metadata for completion notification\nconst totalCount = leads.length;\n\nreturn leads.map((lead, i) => ({\n  json: {\n    phone: (lead.phone || '').toString().replace(/\\D/g, ''),\n    message: lead.message || 'Merhaba!',\n    delay: i === 0 ? 0 : Math.floor(Math.random() * 61) + 20,\n    _meta: {\n      total: totalCount,\n      index: i + 1\n    }\n  }\n}));"
+            },
+            "id": "4c181ef6-87a6-47ff-8c0c-bb71d95cf904",
+            "name": "Format Data",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                80,
+                208
+            ]
+        },
+        {
+            "parameters": {
+                "options": {}
+            },
+            "id": "3e025737-62c5-4ab7-84a4-acdca0b016a6",
+            "name": "Loop (Batch 1)",
+            "type": "n8n-nodes-base.splitInBatches",
+            "typeVersion": 3,
+            "position": [
+                304,
+                208
+            ]
+        },
+        {
+            "parameters": {
+                "amount": "={{ $json.delay }}"
+            },
+            "id": "15a4ae80-6b19-4b4e-b0a7-2bf0bd8a6021",
+            "name": "Wait",
+            "type": "n8n-nodes-base.wait",
+            "typeVersion": 1.1,
+            "position": [
+                528,
+                208
+            ],
+            "webhookId": "wait-v19"
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://evolotion2.lueratech.com/message/sendText/testwp",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "apikey",
+                            "value": "D185530EADF4-4A27-B8FC-FAF0ADB6BF67"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\n  \"number\": \"{{ $json.phone }}\",\n  \"text\": {{ JSON.stringify($json.message) }}\n}",
+                "options": {
+                    "timeout": 30000
+                }
+            },
+            "id": "fee00bf6-091c-4fed-8283-69e7692912ac",
+            "name": "HTTP Request",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                752,
+                208
+            ],
+            "onError": "continueRegularOutput"
+        },
+        {
+            "parameters": {
+                "jsCode": "// Get the total count from the last processed item\nconst items = $input.all();\nconst totalSent = items.length;\n\nreturn [{\n  json: {\n    type: 'success',\n    title: 'WhatsApp Gönderimi Tamamlandı',\n    message: `${totalSent} mesaj başarıyla gönderildi.`,\n    read: false\n  }\n}];"
+            },
+            "id": "82ccbdfa-ab00-4e4b-8f2f-5215b3908338",
+            "name": "Bildirim Hazırla",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                528,
+                -16
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://supabasekong-s8gc44cg0s4scogoskogs4oc.lueratech.com/rest/v1/notifications",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "apikey",
+                            "value": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc2OTExODE4MCwiZXhwIjo0OTI0NzkxNzgwLCJyb2xlIjoiYW5vbiJ9.puoy6ZxX7fqXuLWFHG9GyHnEGXeZ3cEFK_sgOn5ZQk8"
+                        },
+                        {
+                            "name": "Authorization",
+                            "value": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc2OTExODE4MCwiZXhwIjo0OTI0NzkxNzgwLCJyb2xlIjoiYW5vbiJ9.puoy6ZxX7fqXuLWFHG9GyHnEGXeZ3cEFK_sgOn5ZQk8"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        },
+                        {
+                            "name": "Prefer",
+                            "value": "return=minimal"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\n  \"type\": \"{{ $json.type }}\",\n  \"title\": \"{{ $json.title }}\",\n  \"message\": \"{{ $json.message }}\",\n  \"read\": false\n}",
+                "options": {
+                    "timeout": 10000
+                }
+            },
+            "id": "1566b7f8-be23-4791-899d-d55e3b922276",
+            "name": "Supabase Bildirim",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                752,
+                -16
+            ],
+            "onError": "continueRegularOutput"
+        }
+    ],
+    "connections": {
+        "Webhook V19": {
+            "main": [
+                [
+                    {
+                        "node": "Hızlı Yanıt",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "Format Data",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Format Data": {
+            "main": [
+                [
+                    {
+                        "node": "Loop (Batch 1)",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Loop (Batch 1)": {
+            "main": [
+                [
+                    {
+                        "node": "Bildirim Hazırla",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Wait",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Wait": {
+            "main": [
+                [
+                    {
+                        "node": "HTTP Request",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "HTTP Request": {
+            "main": [
+                [
+                    {
+                        "node": "Loop (Batch 1)",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Bildirim Hazırla": {
+            "main": [
+                [
+                    {
+                        "node": "Supabase Bildirim",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "pinData": {},
+    "meta": {
+        "instanceId": "cdff0445899da88f2bd87cd11999f662983047f1a677170d82f62cebe2eb3755"
+    }
+}

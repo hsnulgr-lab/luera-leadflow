@@ -1,0 +1,94 @@
+{
+    "name": "QR Code Store & Retrieve",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "={{$json[\"headers\"][\"method\"] || \"POST\"}}",
+                "path": "qrcode-store",
+                "options": {
+                    "responseMode": "lastNode"
+                }
+            },
+            "id": "webhook-store",
+            "name": "Store Webhook",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 2,
+            "position": [
+                250,
+                200
+            ]
+        },
+        {
+            "parameters": {
+                "httpMethod": "GET",
+                "path": "qrcode-latest",
+                "options": {
+                    "responseMode": "lastNode"
+                }
+            },
+            "id": "webhook-get",
+            "name": "Get Latest Webhook",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 2,
+            "position": [
+                250,
+                400
+            ]
+        },
+        {
+            "parameters": {
+                "mode": "runOnceForAllItems",
+                "jsCode": "// Global değişken olarak son QR kodu sakla\nconst body = $input.first().json.body || $input.first().json;\n\n// Static store için global context kullan\nconst staticData = $getWorkflowStaticData('global');\n\nif (body.qrCodeBase64) {\n  staticData.latestQRCode = {\n    qrCodeBase64: body.qrCodeBase64,\n    instanceName: body.instanceName,\n    timestamp: body.timestamp || new Date().toISOString(),\n    event: body.event\n  };\n  console.log('QR Code stored:', staticData.latestQRCode.instanceName);\n}\n\nreturn [{\n  json: {\n    success: true,\n    message: 'QR code stored successfully',\n    data: staticData.latestQRCode\n  }\n}];"
+            },
+            "id": "store-code",
+            "name": "Store QR Code",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                500,
+                200
+            ]
+        },
+        {
+            "parameters": {
+                "mode": "runOnceForAllItems",
+                "jsCode": "// Global context'ten son QR kodunu al\nconst staticData = $getWorkflowStaticData('global');\nconst latestQR = staticData.latestQRCode || null;\n\nif (latestQR) {\n  return [{\n    json: {\n      success: true,\n      data: latestQR\n    }\n  }];\n} else {\n  return [{\n    json: {\n      success: false,\n      message: 'No QR code available yet',\n      data: null\n    }\n  }];\n}"
+            },
+            "id": "get-code",
+            "name": "Get Latest QR Code",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                500,
+                400
+            ]
+        }
+    ],
+    "connections": {
+        "Store Webhook": {
+            "main": [
+                [
+                    {
+                        "node": "Store QR Code",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Get Latest Webhook": {
+            "main": [
+                [
+                    {
+                        "node": "Get Latest QR Code",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "executionOrder": "v1"
+    }
+}

@@ -1,0 +1,241 @@
+{
+    "name": "WhatsApp - Toplu Gönderim V17 (Anti-Spam Mimarisi)",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "whatsapp-bulk-v17",
+                "responseMode": "responseNode",
+                "options": {
+                    "responseHeaders": {
+                        "entries": [
+                            {
+                                "name": "Access-Control-Allow-Origin",
+                                "value": "*"
+                            },
+                            {
+                                "name": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ]
+                    }
+                }
+            },
+            "id": "webhook-v17",
+            "name": "Webhook V17",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 2.1,
+            "position": [
+                -200,
+                240
+            ],
+            "webhookId": "whatsapp-bulk-v17"
+        },
+        {
+            "parameters": {
+                "respondWith": "json",
+                "responseBody": "={\n  \"success\": true,\n  \"message\": \"V17 Anti-Spam İşlemi Başlatıldı\",\n  \"total_leads\": {{ $node[\"Webhook V17\"].json.body.leads.length }},\n  \"timestamp\": \"{{ $now.toISO() }}\"\n}",
+                "options": {}
+            },
+            "id": "respond-v17",
+            "name": "Hızlı Yanıt",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1.5,
+            "position": [
+                20,
+                80
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const body = $input.first().json.body;\nconst leads = body.leads || [];\n\n// Telefon numaralarını standart hale getiriyoruz\nconst items = leads.map((lead, index) => {\n  let phone = (lead.phone || lead.phoneNumber || '').toString().replace(/\\D/g, '');\n  if (phone.startsWith('0')) phone = '90' + phone.substring(1);\n  else if (!phone.startsWith('90') && phone.length === 10) phone = '90' + phone;\n\n  return {\n    json: {\n      ...lead,\n      phone: phone,\n      index: index + 1,\n      total: leads.length\n    }\n  };\n});\n\nreturn items;"
+            },
+            "id": "format-v17",
+            "name": "Format Data",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                20,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "batchSize": 1,
+                "options": {}
+            },
+            "id": "loop-v17",
+            "name": "Loop Over Items",
+            "type": "n8n-nodes-base.splitInBatches",
+            "typeVersion": 3,
+            "position": [
+                240,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "modelId": "gpt-4o-mini",
+                "messages": {
+                    "values": [
+                        {
+                            "content": "={{ $json.message ? 'Aşağıdaki mesajı WhatsApp için samimi, akıcı ve profesyonel bir dille, emojiler kullanarak yeniden yaz (kısa tut): ' + $json.message : 'Luera Teknoloji adına şu firmaya, sunduğumuz yapay zeka çözümleri hakkında dikkat çekici, kısa ve samimi bir tanışma mesajı yaz. Firma: ' + ($json.companyName || 'Sayın Yetkili') + ', Sektör: ' + ($json.companyCategory || 'Genel') }}"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "openai-v17",
+            "name": "OpenAI Node",
+            "type": "n8n-nodes-base.openAi",
+            "typeVersion": 1,
+            "position": [
+                460,
+                300
+            ],
+            "credentials": {
+                "openAiApi": {
+                    "id": "OpenAi Credentials",
+                    "name": "OpenAi account"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "jsCode": "return { \n  json: { \n    wait_time: Math.floor(Math.random() * (80 - 20 + 1)) + 20 \n  } \n};"
+            },
+            "id": "delay-calc-v17",
+            "name": "Random Delay",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                680,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "amount": "={{ $json.wait_time }}",
+                "unit": "seconds"
+            },
+            "id": "wait-v17",
+            "name": "Wait Node",
+            "type": "n8n-nodes-base.wait",
+            "typeVersion": 1.1,
+            "position": [
+                900,
+                300
+            ],
+            "webhookId": "wait-v17-webhook"
+        },
+        {
+            "parameters": {
+                "resource": "messages-api",
+                "operation": "sendText",
+                "instanceName": "testwp",
+                "number": "={{ $('Loop Over Items').item.json.phone }}",
+                "text": "={{ $('OpenAI Node').item.json.message.content || $('Loop Over Items').item.json.message }}",
+                "options_message": {}
+            },
+            "id": "evolution-v17",
+            "name": "Evolution - Send Text",
+            "type": "n8n-nodes-evolution-api-en.evolutionApi",
+            "typeVersion": 1,
+            "position": [
+                1120,
+                300
+            ],
+            "credentials": {
+                "evolutionApi": {
+                    "id": "aQpIhjoqUeyDlohw",
+                    "name": "Evolution account"
+                }
+            },
+            "onError": "continueRegularOutput"
+        }
+    ],
+    "connections": {
+        "Webhook V17": {
+            "main": [
+                [
+                    {
+                        "node": "Hızlı Yanıt",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "Format Data",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Format Data": {
+            "main": [
+                [
+                    {
+                        "node": "Loop Over Items",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Loop Over Items": {
+            "main": [
+                [
+                    {
+                        "node": "OpenAI Node",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "OpenAI Node": {
+            "main": [
+                [
+                    {
+                        "node": "Random Delay",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Random Delay": {
+            "main": [
+                [
+                    {
+                        "node": "Wait Node",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Wait Node": {
+            "main": [
+                [
+                    {
+                        "node": "Evolution - Send Text",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Evolution - Send Text": {
+            "main": [
+                [
+                    {
+                        "node": "Loop Over Items",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}

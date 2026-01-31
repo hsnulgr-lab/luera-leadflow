@@ -1,0 +1,211 @@
+{
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "evolution-qr",
+                "options": {}
+            },
+            "id": "463b7712-d46c-4351-b588-f177a727cb01",
+            "name": "Webhook (evolution-qr)",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+                -736,
+                112
+            ],
+            "webhookId": "fc2c168a-729c-4105-9e31-71c6840c41c9"
+        },
+        {
+            "parameters": {
+                "dataType": "string",
+                "value1": "={{ $json.body.event }}",
+                "rules": {
+                    "rules": [
+                        {
+                            "value2": "qrcode.updated"
+                        },
+                        {
+                            "value2": "connection.update",
+                            "output": 1
+                        }
+                    ]
+                },
+                "fallbackOutput": 2
+            },
+            "id": "68e1fd1d-3ecb-4f08-af17-cfc87a1bbbf7",
+            "name": "Switch Event",
+            "type": "n8n-nodes-base.switch",
+            "typeVersion": 1,
+            "position": [
+                -528,
+                112
+            ]
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": "",
+                        "typeValidation": "strict"
+                    },
+                    "conditions": [
+                        {
+                            "id": "cond-open",
+                            "leftValue": "={{ $json.body.data.state }}",
+                            "rightValue": "open",
+                            "operator": {
+                                "type": "string",
+                                "operation": "equals"
+                            }
+                        }
+                    ],
+                    "combinator": "and"
+                },
+                "options": {}
+            },
+            "id": "237e690c-4cec-4a25-b7e0-8ceefec2e44a",
+            "name": "Is Connected?",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2,
+            "position": [
+                -304,
+                208
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://supabasekong-s8gc44cg0s4scogoskogs4oc.lueratech.com/rest/v1/qr_codes",
+                "sendQuery": true,
+                "queryParameters": {
+                    "parameters": [
+                        {
+                            "name": "on_conflict",
+                            "value": "instance_name"
+                        }
+                    ]
+                },
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "apikey",
+                            "value": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc2OTExODE4MCwiZXhwIjo0OTI0NzkxNzgwLCJyb2xlIjoiYW5vbiJ9.puoy6ZxX7fqXuLWFHG9GyHnEGXeZ3cEFK_sgOn5ZQk8"
+                        },
+                        {
+                            "name": "Authorization",
+                            "value": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc2OTExODE4MCwiZXhwIjo0OTI0NzkxNzgwLCJyb2xlIjoiYW5vbiJ9.puoy6ZxX7fqXuLWFHG9GyHnEGXeZ3cEFK_sgOn5ZQk8"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        },
+                        {
+                            "name": "Prefer",
+                            "value": "resolution=merge-duplicates"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\n  \"instance_name\": \"{{ $json.body.instance }}\",\n  \"qr_base64\": \"{{ $json.body.data.qrcode.base64 }}\",\n  \"updated_at\": \"{{ $now.toISO() }}\"\n}",
+                "options": {}
+            },
+            "id": "fec45bf3-023e-40e9-8ed8-f27a00c8878b",
+            "name": "Save QR to Supabase",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                -80,
+                0
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://supabasekong-s8gc44cg0s4scogoskogs4oc.lueratech.com/rest/v1/qr_codes",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "apikey",
+                            "value": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc2OTExODE4MCwiZXhwIjo0OTI0NzkxNzgwLCJyb2xlIjoiYW5vbiJ9.puoy6ZxX7fqXuLWFHG9GyHnEGXeZ3cEFK_sgOn5ZQk8"
+                        },
+                        {
+                            "name": "Authorization",
+                            "value": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc2OTExODE4MCwiZXhwIjo0OTI0NzkxNzgwLCJyb2xlIjoiYW5vbiJ9.puoy6ZxX7fqXuLWFHG9GyHnEGXeZ3cEFK_sgOn5ZQk8"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        },
+                        {
+                            "name": "Prefer",
+                            "value": "resolution=merge-duplicates"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\n  \"instance_name\": \"{{ $json.body.instance }}\",\n  \"qr_base64\": null,\n  \"updated_at\": \"{{ $now.toISO() }}\"\n}",
+                "options": {}
+            },
+            "id": "f8d70a15-5e98-4dd8-9e8d-e25699b68507",
+            "name": "Clear QR (Connected)",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                144,
+                208
+            ]
+        }
+    ],
+    "connections": {
+        "Webhook (evolution-qr)": {
+            "main": [
+                [
+                    {
+                        "node": "Switch Event",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Switch Event": {
+            "main": [
+                [
+                    {
+                        "node": "Save QR to Supabase",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Is Connected?",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Is Connected?": {
+            "main": [
+                [
+                    {
+                        "node": "Clear QR (Connected)",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "pinData": {},
+    "meta": {
+        "instanceId": "cdff0445899da88f2bd87cd11999f662983047f1a677170d82f62cebe2eb3755"
+    }
+}

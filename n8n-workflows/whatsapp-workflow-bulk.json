@@ -1,0 +1,182 @@
+{
+    "name": "WhatsApp - Debug Modu (Strict v2)",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "whatsapp-send-bulk",
+                "responseMode": "responseNode",
+                "options": {
+                    "responseHeaders": {
+                        "entries": [
+                            {
+                                "name": "Access-Control-Allow-Origin",
+                                "value": "*"
+                            }
+                        ]
+                    }
+                }
+            },
+            "id": "webhook-trigger",
+            "name": "Webhook",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 2.1,
+            "position": [
+                -656,
+                128
+            ],
+            "webhookId": "whatsapp-send-bulk"
+        },
+        {
+            "parameters": {
+                "jsCode": "const inputData = $input.first();\nconst leads = inputData.json.body.leads || [];\nconst messageTemplate = inputData.json.body.message || '';\n\nconst outputItems = [];\n\nfor (const lead of leads) {\n  let phone = (lead.phone || lead.phoneNumber || '').replace(/\\D/g, '');\n  if (phone.startsWith('0')) phone = '90' + phone.substring(1);\n  else if (!phone.startsWith('90') && phone.length === 10) phone = '90' + phone;\n\n  outputItems.push({\n    json: {\n      phone,\n      message: lead.message || messageTemplate,\n      companyName: lead.companyName || ''\n    }\n  });\n}\n\nreturn outputItems;"
+            },
+            "id": "format-leads",
+            "name": "Format Leads",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                -448,
+                360
+            ]
+        },
+        {
+            "parameters": {
+                "respondWith": "json",
+                "responseBody": "={\n  \"success\": true,\n  \"message\": \"İşlem alındı. Kuyruk başlatılıyor.\",\n  \"count\": {{ $json.body.leads.length }}\n}",
+                "options": {}
+            },
+            "id": "respond-ok",
+            "name": "Hızlı Yanıt",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1.5,
+            "position": [
+                -448,
+                -40
+            ]
+        },
+        {
+            "parameters": {
+                "batchSize": 1,
+                "options": {
+                    "reset": true
+                }
+            },
+            "id": "loop-node",
+            "name": "Döngü (Loop)",
+            "type": "n8n-nodes-base.splitInBatches",
+            "typeVersion": 3,
+            "position": [
+                -224,
+                360
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://evolotion2.lueratech.com/message/sendText/testwp",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "apikey",
+                            "value": "D185530EADF4-4A27-B8FC-FAF0ADB6BF67"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\n  \"number\": \"{{ $json.phone }}\",\n  \"text\": {{ JSON.stringify($json.message) }}\n}",
+                "options": {}
+            },
+            "id": "evolution-api",
+            "name": "Mesaj Gönder",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                0,
+                360
+            ]
+        },
+        {
+            "parameters": {
+                "amount": 10,
+                "unit": "seconds"
+            },
+            "id": "wait-node",
+            "name": "Bekle (10s)",
+            "type": "n8n-nodes-base.wait",
+            "typeVersion": 1.1,
+            "position": [
+                220,
+                360
+            ]
+        }
+    ],
+    "connections": {
+        "Webhook": {
+            "main": [
+                [
+                    {
+                        "node": "Hızlı Yanıt",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "Format Leads",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Format Leads": {
+            "main": [
+                [
+                    {
+                        "node": "Döngü (Loop)",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Döngü (Loop)": {
+            "main": [
+                [
+                    {
+                        "node": "Mesaj Gönder",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Mesaj Gönder": {
+            "main": [
+                [
+                    {
+                        "node": "Bekle (10s)",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Bekle (10s)": {
+            "main": [
+                [
+                    {
+                        "node": "Döngü (Loop)",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}

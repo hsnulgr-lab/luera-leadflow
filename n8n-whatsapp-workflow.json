@@ -1,0 +1,410 @@
+{
+  "name": "WhatsApp Lead Messaging Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp-message",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook: Receive Message Request",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [200, 300],
+      "webhookId": "whatsapp-message-webhook"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "lead-name",
+              "name": "leadName",
+              "type": "string",
+              "value": "={{ $json.body.leadName }}"
+            },
+            {
+              "id": "phone",
+              "name": "phone",
+              "type": "string",
+              "value": "={{ $json.body.phone }}"
+            },
+            {
+              "id": "company",
+              "name": "company",
+              "type": "string",
+              "value": "={{ $json.body.company }}"
+            },
+            {
+              "id": "sector",
+              "name": "sector",
+              "type": "string",
+              "value": "={{ $json.body.sector }}"
+            },
+            {
+              "id": "website",
+              "name": "website",
+              "type": "string",
+              "value": "={{ $json.body.website || '' }}"
+            },
+            {
+              "id": "rating",
+              "name": "rating",
+              "type": "number",
+              "value": "={{ $json.body.rating || 0 }}"
+            },
+            {
+              "id": "customMessage",
+              "name": "customMessage",
+              "type": "string",
+              "value": "={{ $json.body.customMessage || '' }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "extract-data",
+      "name": "Extract Lead Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [400, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-custom-message",
+              "leftValue": "={{ $json.customMessage }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-custom-message",
+      "name": "Has Custom Message?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [600, 300]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o-mini",
+        "messages": {
+          "values": [
+            {
+              "content": "={{ `Sen ${$json.sector} sektöründeki işletmelere dijital pazarlama çözümleri sunan profesyonel bir satış uzmanısın.\n\nİşletme Bilgileri:\n- İsim: ${$json.company}\n- Sektör: ${$json.sector}\n- Website: ${$json.website || 'Yok'}\n- Google Puanı: ${$json.rating || 'Bilinmiyor'}\n\nGörev: Bu işletme için kişiselleştirilmiş, samimi ama profesyonel bir ilk WhatsApp mesajı yaz.\n\nKurallar:\n1. Maksimum 100 kelime\n2. Değer önerisi net olsun\n3. Somut rakamlar kullan (örn: \"%30 artış\", \"50+ yeni müşteri\")\n4. Tek bir CTA (Call to Action) olsun\n5. 2-3 emoji kullan\n6. Spam gibi görünme, samimi ol\n7. Sadece mesaj metnini yaz, başka bir şey ekleme` }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "openai-generate",
+      "name": "OpenAI: Generate Message",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.5,
+      "position": [800, 400],
+      "credentials": {
+        "openAiApi": {
+          "id": "YOUR_OPENAI_CREDENTIAL_ID",
+          "name": "OpenAI API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "message",
+              "name": "message",
+              "type": "string",
+              "value": "={{ $json.customMessage }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "use-custom-message",
+      "name": "Use Custom Message",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [800, 200]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "message",
+              "name": "message",
+              "type": "string",
+              "value": "={{ $json.message?.content || $json.text || $json.output }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "format-ai-message",
+      "name": "Format AI Message",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1000, 400]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineAll",
+        "options": {}
+      },
+      "id": "merge-messages",
+      "name": "Merge Message Paths",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [1200, 300]
+    },
+    {
+      "parameters": {
+        "amount": "={{ Math.floor(Math.random() * 3 + 2) }}"
+      },
+      "id": "random-wait",
+      "name": "Random Wait (2-5s)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1400, 300],
+      "webhookId": "random-wait-webhook"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.EVOLUTION_API_URL || 'http://localhost:8080' }}/message/sendText/{{ $env.EVOLUTION_INSTANCE_NAME || 'whatsapp-leads' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.EVOLUTION_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"number\": \"{{ $('Extract Lead Data').item.json.phone.replace(/\\D/g, '').replace(/^0/, '90') }}@s.whatsapp.net\",\n  \"text\": \"{{ $json.message }}\",\n  \"delay\": 1000\n}",
+        "options": {}
+      },
+      "id": "evolution-send",
+      "name": "Evolution API: Send WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1600, 300],
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "success",
+              "name": "success",
+              "type": "boolean",
+              "value": "={{ $json.key ? true : false }}"
+            },
+            {
+              "id": "messageId",
+              "name": "messageId",
+              "type": "string",
+              "value": "={{ $json.key?.id || 'error' }}"
+            },
+            {
+              "id": "status",
+              "name": "status",
+              "type": "string",
+              "value": "={{ $json.key ? 'sent' : 'failed' }}"
+            },
+            {
+              "id": "phone",
+              "name": "phone",
+              "type": "string",
+              "value": "={{ $('Extract Lead Data').item.json.phone }}"
+            },
+            {
+              "id": "leadName",
+              "name": "leadName",
+              "type": "string",
+              "value": "={{ $('Extract Lead Data').item.json.leadName }}"
+            },
+            {
+              "id": "sentAt",
+              "name": "sentAt",
+              "type": "string",
+              "value": "={{ new Date().toISOString() }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "format-response",
+      "name": "Format Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1800, 300]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "respond-webhook",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [2000, 300]
+    }
+  ],
+  "connections": {
+    "Webhook: Receive Message Request": {
+      "main": [
+        [
+          {
+            "node": "Extract Lead Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Lead Data": {
+      "main": [
+        [
+          {
+            "node": "Has Custom Message?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Custom Message?": {
+      "main": [
+        [
+          {
+            "node": "Use Custom Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "OpenAI: Generate Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Use Custom Message": {
+      "main": [
+        [
+          {
+            "node": "Merge Message Paths",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI: Generate Message": {
+      "main": [
+        [
+          {
+            "node": "Format AI Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format AI Message": {
+      "main": [
+        [
+          {
+            "node": "Merge Message Paths",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Message Paths": {
+      "main": [
+        [
+          {
+            "node": "Random Wait (2-5s)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Random Wait (2-5s)": {
+      "main": [
+        [
+          {
+            "node": "Evolution API: Send WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evolution API: Send WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "instanceId": "whatsapp-lead-automation"
+  }
+}

@@ -1,0 +1,87 @@
+{
+    "name": "WhatsApp Connect Trigger",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "whatsapp-start",
+                "options": {}
+            },
+            "id": "webhook-trigger",
+            "name": "Webhook",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+                460,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "method": "GET",
+                "url": "={{ 'https://evolotion2.lueratech.com/instance/connect/' + $json.body.instanceName }}",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpHeaderAuth",
+                "options": {
+                    "allowUnauthorizedCerts": true
+                }
+            },
+            "id": "evolution-api-call",
+            "name": "Evolution API Connect",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                680,
+                300
+            ],
+            "credentials": {
+                "httpHeaderAuth": {
+                    "id": "embed-api-key",
+                    "name": "Evolution API Key (Embedded)",
+                    "customAuth": {
+                        "name": "apikey",
+                        "value": "D185530EADF4-4A27-B8FC-FAF0ADB6BF67"
+                    }
+                }
+            }
+        },
+        {
+            "parameters": {
+                "options": {}
+            },
+            "id": "respond-success",
+            "name": "Respond to Webhook",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1,
+            "position": [
+                900,
+                300
+            ]
+        }
+    ],
+    "pinData": {},
+    "connections": {
+        "Webhook": {
+            "main": [
+                [
+                    {
+                        "node": "Evolution API Connect",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Evolution API Connect": {
+            "main": [
+                [
+                    {
+                        "node": "Respond to Webhook",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}

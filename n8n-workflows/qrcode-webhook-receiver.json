@@ -1,0 +1,170 @@
+{
+    "name": "Evolution QR Code Webhook Receiver",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "evolution-qrcode",
+                "options": {
+                    "responseMode": "onReceived"
+                }
+            },
+            "id": "webhook-trigger",
+            "name": "Webhook Trigger",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 2,
+            "position": [
+                250,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "mode": "runOnceForAllItems",
+                "jsCode": "// Evolution API'den gelen QRCODE_UPDATED event'ini parse et\nconst body = $input.first().json.body || $input.first().json;\n\nconsole.log('Received webhook data:', JSON.stringify(body, null, 2));\n\n// QR kod verisini çıkar\nlet qrCodeBase64 = null;\nlet instanceName = null;\nlet event = null;\n\nif (body.event === 'qrcode.updated' || body.event === 'QRCODE_UPDATED') {\n  event = body.event;\n  instanceName = body.instance?.instanceName || body.instanceName || 'unknown';\n  \n  // QR kod base64 verisi farklı yerlerde olabilir\n  if (body.data?.qrcode?.base64) {\n    qrCodeBase64 = body.data.qrcode.base64;\n  } else if (body.data?.base64) {\n    qrCodeBase64 = body.data.base64;\n  } else if (body.qrcode?.base64) {\n    qrCodeBase64 = body.qrcode.base64;\n  } else if (body.base64) {\n    qrCodeBase64 = body.base64;\n  }\n}\n\nreturn [{\n  json: {\n    event: event,\n    instanceName: instanceName,\n    qrCodeBase64: qrCodeBase64,\n    timestamp: new Date().toISOString(),\n    rawData: body\n  }\n}];"
+            },
+            "id": "parse-qrcode",
+            "name": "Parse QR Code",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                450,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": "",
+                        "typeValidation": "loose"
+                    },
+                    "conditions": [
+                        {
+                            "id": "check-qrcode",
+                            "leftValue": "={{ $json.qrCodeBase64 }}",
+                            "rightValue": "",
+                            "operator": {
+                                "type": "string",
+                                "operation": "notEmpty"
+                            }
+                        }
+                    ],
+                    "combinator": "and"
+                },
+                "options": {}
+            },
+            "id": "has-qrcode",
+            "name": "Has QR Code?",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2,
+            "position": [
+                650,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://n8n.lueratech.com/webhook/qrcode-store",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ JSON.stringify($json) }}"
+            },
+            "id": "store-qrcode",
+            "name": "Store QR Code",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                850,
+                200
+            ],
+            "continueOnFail": true
+        },
+        {
+            "parameters": {
+                "mode": "runOnceForAllItems",
+                "jsCode": "return [{ json: { status: 'stored', message: 'QR code received and stored', timestamp: new Date().toISOString() } }];"
+            },
+            "id": "success-response",
+            "name": "Success Response",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                1050,
+                200
+            ]
+        },
+        {
+            "parameters": {
+                "mode": "runOnceForAllItems",
+                "jsCode": "return [{ json: { status: 'ignored', message: 'No QR code in payload', timestamp: new Date().toISOString() } }];"
+            },
+            "id": "no-qrcode-response",
+            "name": "No QR Code Response",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                850,
+                400
+            ]
+        }
+    ],
+    "connections": {
+        "Webhook Trigger": {
+            "main": [
+                [
+                    {
+                        "node": "Parse QR Code",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Parse QR Code": {
+            "main": [
+                [
+                    {
+                        "node": "Has QR Code?",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Has QR Code?": {
+            "main": [
+                [
+                    {
+                        "node": "Store QR Code",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "No QR Code Response",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Store QR Code": {
+            "main": [
+                [
+                    {
+                        "node": "Success Response",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "executionOrder": "v1"
+    }
+}
