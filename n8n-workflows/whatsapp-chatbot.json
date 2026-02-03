@@ -1,0 +1,186 @@
+{
+    "nodes": [
+        {
+            "parameters": {},
+            "id": "b4fbd1e6-76bd-43bb-9dfa-94147a60eded",
+            "name": "Execute Workflow Trigger",
+            "type": "n8n-nodes-base.executeWorkflowTrigger",
+            "typeVersion": 1,
+            "position": [
+                -400,
+                96
+            ]
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": "",
+                        "typeValidation": "strict"
+                    },
+                    "conditions": [
+                        {
+                            "id": "not-from-me",
+                            "leftValue": "={{ $json.body.data.key.fromMe }}",
+                            "rightValue": false,
+                            "operator": {
+                                "type": "boolean",
+                                "operation": "equals"
+                            }
+                        },
+                        {
+                            "id": "not-group",
+                            "leftValue": "={{ $json.body.data.key.remoteJid }}",
+                            "rightValue": "g.us",
+                            "operator": {
+                                "type": "string",
+                                "operation": "notContains"
+                            }
+                        }
+                    ],
+                    "combinator": "and"
+                },
+                "options": {}
+            },
+            "id": "857f2660-5b09-434d-ade0-278e0231e9d1",
+            "name": "Filter Incoming",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2,
+            "position": [
+                -176,
+                96
+            ]
+        },
+        {
+            "parameters": {
+                "promptType": "define",
+                "text": "={{ $json.body.data.message.conversation || $json.body.data.message.extendedTextMessage.text }}",
+                "options": {
+                    "systemMessage": "Sen LueraTech şirketinin yardımsever ve profesyonel müşteri temsilcisisin. \n\nŞirket Bilgileri:\n- Biz gelişmiş WhatsApp otomasyon yazılımları ve CRM panelleri yapıyoruz.\n- Müşterilere hızlı, nazik ve çözüm odaklı cevaplar ver.\n- Fiyat bilgisi sorulursa 'Paketlerimiz işletmenizin ihtiyacına göre değişmektedir, detaylı bilgi için web sitemizi ziyaret edebilirsiniz' de.\n- Bilmediğin bir konu olursa 'Bu konuda yetkili arkadaşıma yönlendiriyorum' diyerek cevap ver."
+                }
+            },
+            "type": "@n8n/n8n-nodes-langchain.agent",
+            "typeVersion": 1.6,
+            "position": [
+                96,
+                80
+            ],
+            "id": "1ab5cd39-18ef-4acf-af90-36b10ccc5e57",
+            "name": "AI Agent"
+        },
+        {
+            "parameters": {
+                "options": {}
+            },
+            "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+            "typeVersion": 1,
+            "position": [
+                60,
+                300
+            ],
+            "id": "596b1f90-1914-4fad-b188-b18840c90343",
+            "name": "Google Gemini Chat Model",
+            "credentials": {
+                "googlePalmApi": {
+                    "id": "M3RpA2zYrTybzeFD",
+                    "name": "Google Gemini(PaLM) Api account"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "sessionId": "={{ $('Execute Workflow Trigger').item.json.body.data.key.remoteJid }}"
+            },
+            "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+            "typeVersion": 1.2,
+            "position": [
+                220,
+                300
+            ],
+            "id": "memory-node-1",
+            "name": "Window Buffer Memory"
+        },
+        {
+            "parameters": {
+                "resource": "messages-api",
+                "operation": "sendText",
+                "instanceName": "testwp",
+                "remoteJid": "={{ $('Execute Workflow Trigger').item.json.body.data.key.remoteJid }}",
+                "text": "={{ $json.output }}",
+                "options_message": {}
+            },
+            "type": "n8n-nodes-evolution-api-en.evolutionApi",
+            "typeVersion": 1,
+            "position": [
+                460,
+                96
+            ],
+            "id": "5c25da93-c5fb-4e2b-8d4a-5633b058b277",
+            "name": "Send text",
+            "credentials": {
+                "evolutionApi": {
+                    "id": "aQpIhjoqUeyDlohw",
+                    "name": "Evolution account"
+                }
+            }
+        }
+    ],
+    "connections": {
+        "Execute Workflow Trigger": {
+            "main": [
+                [
+                    {
+                        "node": "Filter Incoming",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Filter Incoming": {
+            "main": [
+                [
+                    {
+                        "node": "AI Agent",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "AI Agent": {
+            "main": [
+                [
+                    {
+                        "node": "Send text",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Google Gemini Chat Model": {
+            "ai_languageModel": [
+                [
+                    {
+                        "node": "AI Agent",
+                        "type": "ai_languageModel",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Window Buffer Memory": {
+            "ai_memory": [
+                [
+                    {
+                        "node": "AI Agent",
+                        "type": "ai_memory",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}

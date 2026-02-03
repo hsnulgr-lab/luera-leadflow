@@ -1,0 +1,109 @@
+{
+    "name": "WhatsApp Master Router",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "whatsapp-master",
+                "options": {}
+            },
+            "id": "webhook-trigger",
+            "name": "Master Webhook",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+                0,
+                0
+            ],
+            "webhookId": "whatsapp-master-router"
+        },
+        {
+            "parameters": {
+                "dataType": "string",
+                "value1": "={{ $json.body.event }}",
+                "rules": {
+                    "rules": [
+                        {
+                            "value2": "qrcode.updated",
+                            "output": 0
+                        },
+                        {
+                            "value2": "connection.update",
+                            "output": 0
+                        },
+                        {
+                            "value2": "messages.upsert",
+                            "output": 1
+                        }
+                    ]
+                },
+                "fallbackOutput": 2
+            },
+            "id": "switch-event",
+            "name": "Switch Event Type",
+            "type": "n8n-nodes-base.switch",
+            "typeVersion": 1,
+            "position": [
+                220,
+                0
+            ]
+        },
+        {
+            "parameters": {
+                "workflowId": "qr-code-workflow-id"
+            },
+            "id": "exec-qr",
+            "name": "Execute QR Handler",
+            "type": "n8n-nodes-base.executeWorkflow",
+            "typeVersion": 1,
+            "position": [
+                480,
+                -100
+            ]
+        },
+        {
+            "parameters": {
+                "workflowId": "chatbot-workflow-id"
+            },
+            "id": "exec-chatbot",
+            "name": "Execute AI Chatbot",
+            "type": "n8n-nodes-base.executeWorkflow",
+            "typeVersion": 1,
+            "position": [
+                480,
+                100
+            ]
+        }
+    ],
+    "connections": {
+        "Master Webhook": {
+            "main": [
+                [
+                    {
+                        "node": "Switch Event Type",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Switch Event Type": {
+            "main": [
+                [
+                    {
+                        "node": "Execute QR Handler",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Execute AI Chatbot",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}

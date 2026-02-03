@@ -12,6 +12,8 @@ import { SchedulerPage } from "./pages/SchedulerPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { Loader2 } from "lucide-react";
 
+import { ErrorBoundary } from "./components/common/ErrorBoundary";
+
 // Protected Route Component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     const { isAuthenticated, isLoading } = useAuth();
@@ -39,25 +41,27 @@ const App = () => {
         <BrowserRouter>
             <AuthProvider>
                 <NotificationProvider>
-                    <Routes>
-                        <Route path="/login" element={<LoginPage />} />
+                    <ErrorBoundary>
+                        <Routes>
+                            <Route path="/login" element={<LoginPage />} />
 
-                        <Route path="/" element={
-                            <ProtectedRoute>
-                                <Layout />
-                            </ProtectedRoute>
-                        }>
-                            <Route index element={<DashboardPage />} />
-                            <Route path="leads" element={<LeadsPage />} />
-                            <Route path="analytics" element={<AnalyticsPage />} />
-                            <Route path="whatsapp" element={<WhatsAppPage />} />
-                            <Route path="messages" element={<MessagesPage />} />
-                            <Route path="scheduler" element={<SchedulerPage />} />
-                            <Route path="settings" element={<SettingsPage />} />
-                        </Route>
+                            <Route path="/" element={
+                                <ProtectedRoute>
+                                    <Layout />
+                                </ProtectedRoute>
+                            }>
+                                <Route index element={<DashboardPage />} />
+                                <Route path="leads" element={<LeadsPage />} />
+                                <Route path="analytics" element={<AnalyticsPage />} />
+                                <Route path="whatsapp" element={<WhatsAppPage />} />
+                                <Route path="messages" element={<MessagesPage />} />
+                                <Route path="scheduler" element={<SchedulerPage />} />
+                                <Route path="settings" element={<SettingsPage />} />
+                            </Route>
 
-                        <Route path="*" element={<Navigate to="/" replace />} />
-                    </Routes>
+                            <Route path="*" element={<Navigate to="/" replace />} />
+                        </Routes>
+                    </ErrorBoundary>
                 </NotificationProvider>
             </AuthProvider>
         </BrowserRouter>

@@ -59,24 +59,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
             if (error) {
                 console.error("Supabase Login Error:", error);
-
-                // SMART FALLBACK: If Supabase fails (e.g. valid credentials but env vars not loaded or CORS), try local fallback
-                if (
-                    (email === 'admin' && password === 'admin123') ||
-                    (email === 'furkan@lueratech.com' && password === 'Luera123456')
-                ) {
-                    console.warn("Falling back to local demo user due to Supabase error.");
-                    const demoUser: User = {
-                        id: 'demo-user-id',
-                        email: email,
-                        name: email === 'admin' ? 'Admin User' : 'Furkan',
-                        role: 'Premium'
-                    };
-                    setUser(demoUser);
-                    // Return success but maybe with a warning (not supported by type, but handled in logic)
-                    return { success: true };
-                }
-
                 return { success: false, error: error.message };
             }
 
@@ -84,22 +66,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             return { success: true };
         } catch (err) {
             console.error("Unexpected Login Error:", err);
-
-            // SMART FALLBACK (Catch Block)
-            if (
-                (email === 'admin' && password === 'admin123') ||
-                (email === 'furkan@lueratech.com' && password === 'Luera123456')
-            ) {
-                const demoUser: User = {
-                    id: 'demo-user-id',
-                    email: email,
-                    name: email === 'admin' ? 'Admin User' : 'Furkan',
-                    role: 'Premium'
-                };
-                setUser(demoUser);
-                return { success: true };
-            }
-
             return { success: false, error: 'Giriş yapılırken bir hata oluştu' };
         }
     };

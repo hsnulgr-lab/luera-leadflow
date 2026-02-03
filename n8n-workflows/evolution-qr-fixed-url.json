@@ -17,6 +17,17 @@
             "webhookId": "fc2c168a-729c-4105-9e31-71c6840c41c9"
         },
         {
+            "parameters": {},
+            "id": "exec-trigger-qr-fixed",
+            "name": "Execute Workflow Trigger",
+            "type": "n8n-nodes-base.executeWorkflowTrigger",
+            "typeVersion": 1,
+            "position": [
+                -656,
+                240
+            ]
+        },
+        {
             "parameters": {
                 "dataType": "string",
                 "value1": "={{ $json.body.event }}",
@@ -164,6 +175,17 @@
     ],
     "connections": {
         "Webhook (evolution-qr)": {
+            "main": [
+                [
+                    {
+                        "node": "Switch Event",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Execute Workflow Trigger": {
             "main": [
                 [
                     {
