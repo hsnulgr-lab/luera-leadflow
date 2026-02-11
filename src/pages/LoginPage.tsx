@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { toast } from 'sonner';
+
 import { Eye, EyeOff, Loader2, ArrowRight } from 'lucide-react';
 import { cn } from '@/utils/cn';
 
@@ -67,7 +67,6 @@ export const LoginPage = () => {
         e.preventDefault();
 
         if (!username || !password) {
-            toast.error('Lütfen tüm alanları doldurun');
             setShake(true);
             setTimeout(() => setShake(false), 500);
             return;
@@ -83,7 +82,6 @@ export const LoginPage = () => {
         }
 
         if (!result.success) {
-            toast.error(result.error || 'Giriş yapılamadı');
             setShake(true);
             setTimeout(() => setShake(false), 500);
         }
@@ -273,7 +271,7 @@ export const LoginPage = () => {
                                     <button
                                         type="button"
                                         className="text-sm text-gray-400 hover:text-[#CCFF00] transition-colors"
-                                        onClick={() => toast.info('Şifre sıfırlama özelliği yakında eklenecek')}
+                                        onClick={() => console.log('Şifre sıfırlama')}
                                     >
                                         Şifremi unuttum
                                     </button>
@@ -302,12 +300,7 @@ export const LoginPage = () => {
                                 </button>
                             </form>
 
-                            {/* Demo */}
-                            <div className="mt-6 pt-6 border-t border-white/5 text-center">
-                                <p className="text-sm text-gray-500">
-                                    Demo: <code className="px-2 py-1 bg-white/5 rounded text-gray-400">admin</code> / <code className="px-2 py-1 bg-white/5 rounded text-gray-400">admin123</code>
-                                </p>
-                            </div>
+
                         </div>
                     </div>
 

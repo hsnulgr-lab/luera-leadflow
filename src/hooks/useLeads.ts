@@ -53,20 +53,7 @@ export const useLeads = () => {
             }));
 
             // Force add Test Lead for User Request
-            const testLead: Lead = {
-                id: 'test-funi-loop',
-                name: 'Funi Loop',
-                company: 'Hobi Ürünleri',
-                email: 'test@funiloop.com',
-                phone: '905426026048',
-                website: 'https://funiloop.com',
-                status: 'new',
-                dateAdded: new Date().toISOString(),
-                score: 100
-            };
 
-            // Add to beginning of list
-            mappedLeads.unshift(testLead);
 
             setLeads(mappedLeads);
         } catch (err) {

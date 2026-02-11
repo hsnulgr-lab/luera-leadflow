@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Lead } from "@/types/lead";
 import { aiService } from "@/services/aiService";
 import { Loader2, Wand2, Send, Copy } from "lucide-react";
-import { toast } from "sonner"; // Assuming sonner is used for toasts
+
 
 interface AIMessageDialogProps {
     lead: Lead | null;
@@ -32,7 +32,7 @@ export const AIMessageDialog = ({ lead, open, onOpenChange }: AIMessageDialogPro
             });
             setMessage(generatedMsg);
         } catch (error) {
-            toast.error("Mesaj oluşturulamadı");
+            console.error("Mesaj oluşturulamadı");
         } finally {
             setIsGenerating(false);
         }
@@ -40,7 +40,7 @@ export const AIMessageDialog = ({ lead, open, onOpenChange }: AIMessageDialogPro
 
     const handleCopy = () => {
         navigator.clipboard.writeText(message);
-        toast.success("Mesaj kopyalandı");
+
     };
 
     const handleSendWhatsApp = () => {

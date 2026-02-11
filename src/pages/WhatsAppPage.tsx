@@ -6,13 +6,18 @@ import {
     CheckCircle2,
     MessageSquare,
     LayoutGrid,
+    RefreshCw,
+    Send,
+    AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { n8nEvolutionService } from "@/services/n8nEvolutionService";
 import { useLeads } from "@/hooks/useLeads";
 import { useQRCode } from "@/hooks/useQRCode";
+import { useSentHistory } from "@/hooks/useSentHistory";
 import { cn } from "@/utils/cn";
 import { Badge } from "@/components/ui/badge";
+
 
 // Types
 import { Lead, MessageQueueItem } from "@/types/whatsapp";
@@ -36,9 +41,17 @@ const WhatsAppPage = () => {
     const [bulkSendStatus, setBulkSendStatus] = useState<"idle" | "sending" | "completed">("idle");
     const [lastCompletionTime, setLastCompletionTime] = useState<Date | null>(null);
     const [isEditing, setIsEditing] = useState(false);
+    const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
 
     const INSTANCE_NAME = "testwp";
     const { qrCode, clearQRCode } = useQRCode(INSTANCE_NAME);
+    const { sentLeadIds, sentRecords, markAsSent, wasSent, getSentFromList } = useSentHistory();
+
+    // Bugün gönderilen sayısı ve başarı oranı hesapla
+    const today = new Date().toISOString().split('T')[0];
+    const todaySentCount = sentRecords.filter(r => r.sentAt.startsWith(today)).length;
+    const totalSentCount = sentRecords.length;
+    const totalSuccessRate = totalSentCount > 0 ? 100 : 0; // Şimdilik tüm gönderilenler başarılı
 
     // Automatically close modal when connected
     useEffect(() => {
@@ -160,6 +173,7 @@ const WhatsAppPage = () => {
         } catch (error) {
             console.error("AI Error:", error);
             setPreviewMessage("Mesaj oluşturulamadı. Lütfen tekrar deneyin.");
+
         } finally {
             setIsPreviewLoading(false);
         }
@@ -170,7 +184,34 @@ const WhatsAppPage = () => {
             return;
         }
 
-        const newQueue = selectedLeads.map(lead => {
+        // Duplikat koruması: hem kuyruk hem de gönderim geçmişi kontrolü
+        const existingIds = new Set(messageQueue.map(m => m.lead.id));
+        const inQueue = selectedLeads.filter(l => existingIds.has(l.id));
+        const alreadySent = selectedLeads.filter(l => !existingIds.has(l.id) && wasSent(l.id));
+        const duplicates = [...inQueue, ...alreadySent];
+        const newLeads = selectedLeads.filter(l => !existingIds.has(l.id) && !wasSent(l.id));
+
+        if (duplicates.length > 0) {
+            const queueNames = inQueue.slice(0, 2).map(d => d.name);
+            const sentNames = alreadySent.slice(0, 2).map(d => d.name);
+            let warning = '';
+            if (inQueue.length > 0) {
+                warning += `${queueNames.join(', ')}${inQueue.length > 2 ? ` +${inQueue.length - 2}` : ''} zaten kuyrukta. `;
+            }
+            if (alreadySent.length > 0) {
+                warning += `${sentNames.join(', ')}${alreadySent.length > 2 ? ` +${alreadySent.length - 2}` : ''} daha önce mesaj gönderilmiş.`;
+            }
+            setDuplicateWarning(warning);
+        }
+
+        if (newLeads.length === 0) {
+            setSelectedLeads([]);
+            setPreviewLead(null);
+            setPreviewMessage("");
+            return;
+        }
+
+        const newQueue = newLeads.map(lead => {
             const message = (previewLead?.id === lead.id && previewMessage)
                 ? previewMessage
                 : `Merhaba ${lead.name}! 🚀 ${offerType} hakkında görüşmek isteriz.`;
@@ -184,9 +225,10 @@ const WhatsAppPage = () => {
         });
 
         setMessageQueue(prev => [...prev, ...newQueue]);
-        setSelectedLeads([]); // Clear selection after adding
+        setSelectedLeads([]);
         setPreviewLead(null);
         setPreviewMessage("");
+
     };
 
     const handleSendQueue = async () => {
@@ -195,6 +237,7 @@ const WhatsAppPage = () => {
         const pendingItems = messageQueue.filter(item => item.status === 'pending');
         if (pendingItems.length === 0) {
             setIsSending(false);
+
             return;
         }
 
@@ -202,31 +245,58 @@ const WhatsAppPage = () => {
             setMessageQueue(prev => prev.map(msg => msg.status === 'pending' ? { ...msg, status: 'sending' } : msg));
             setBulkSendStatus('sending');
 
+
             const result = await n8nEvolutionService.sendBulkMessages(pendingItems);
 
             if (result.success) {
                 setMessageQueue(prev => prev.map(msg => msg.status === 'sending' ? { ...msg, status: 'sent' } : msg));
+                // Kalıcı gönderim kaydı
+                await markAsSent(pendingItems.map(item => ({ id: item.lead.id, name: item.lead.name })));
             } else {
                 throw new Error("Bulk send failed");
             }
         } catch (error) {
             console.error("Queue send error:", error);
             setMessageQueue(prev => prev.map(msg => msg.status === 'sending' ? { ...msg, status: 'failed' } : msg));
+
         } finally {
             setIsSending(false);
         }
     };
 
-    const handleClearQueue = () => setMessageQueue([]);
+    const handleClearQueue = () => {
+        setMessageQueue([]);
+
+    };
 
     const handleRemoveFromQueue = (id: string) => {
         setMessageQueue(prev => prev.filter(item => item.id !== id));
+    };
+
+    // Retry: failed mesajı tekrar pending yap
+    const handleRetryItem = (id: string) => {
+        setMessageQueue(prev => prev.map(item =>
+            item.id === id ? { ...item, status: 'pending' as const } : item
+        ));
+
     };
 
     const filteredLeads = realLeads.filter(lead =>
         lead.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
         lead.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
+
+    // Toplu seçim: tüm filtrelenmiş lead'leri seç/kaldır
+    const handleSelectAll = () => {
+        if (selectedLeads.length === filteredLeads.length) {
+            setSelectedLeads([]);
+            setPreviewLead(null);
+            setPreviewMessage("");
+        } else {
+            setSelectedLeads([...filteredLeads]);
+
+        }
+    };
 
     return (
         <div className="h-screen bg-slate-50 flex flex-col overflow-hidden font-sans text-slate-900">
@@ -243,6 +313,38 @@ const WhatsAppPage = () => {
                 </div>
 
                 <div className="flex items-center gap-4">
+                    {/* Mini Stats + Anti-Spam */}
+                    {messageQueue.length > 0 && (
+                        <div className="hidden md:flex items-center gap-2">
+                            <div className="flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100">
+                                <Send className="w-3.5 h-3.5 text-slate-400" />
+                                <span className="text-xs font-semibold text-slate-600">
+                                    {messageQueue.filter(m => m.status === 'sent').length}
+                                </span>
+                                <span className="text-xs text-slate-400">/</span>
+                                <span className="text-xs font-medium text-slate-400">{messageQueue.length}</span>
+                            </div>
+                            {messageQueue.some(m => m.status === 'sent') && (
+                                <div className="flex items-center gap-1.5 bg-green-50 px-3 py-1.5 rounded-lg border border-green-100">
+                                    <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
+                                    <span className="text-xs font-bold text-green-600">
+                                        %{Math.round((messageQueue.filter(m => m.status === 'sent').length / messageQueue.length) * 100)}
+                                    </span>
+                                </div>
+                            )}
+                            {messageQueue.some(m => m.status === 'sending') && (
+                                <div className="flex items-center gap-1.5 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100 animate-pulse">
+                                    <Loader2 className="w-3.5 h-3.5 text-blue-500 animate-spin" />
+                                    <span className="text-xs font-semibold text-blue-600">Gönderiliyor</span>
+                                </div>
+                            )}
+                            <div className="flex items-center gap-1.5 bg-amber-50/80 px-2.5 py-1.5 rounded-lg border border-amber-100/50">
+                                <span className="text-[10px]">🛡️</span>
+                                <span className="text-[10px] font-medium text-amber-600">Anti-spam: 10-85sn aralık</span>
+                            </div>
+                        </div>
+                    )}
+
                     <WhatsAppConnection
                         connectionStatus={connectionStatus}
                         qrCode={qrCode}
@@ -255,36 +357,7 @@ const WhatsAppPage = () => {
                 </div>
             </header>
 
-            {/* Status Banner */}
-            {(bulkSendStatus === 'sending' || bulkSendStatus === 'completed') && (
-                <div className={cn(
-                    "relative overflow-hidden px-6 py-2 flex items-center justify-center gap-3 transition-all duration-300",
-                    bulkSendStatus === 'sending'
-                        ? "bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 border-b border-amber-100"
-                        : "bg-gradient-to-r from-emerald-50 via-green-50 to-emerald-50 border-b border-emerald-100"
-                )}>
-                    <div className={cn(
-                        "absolute inset-0 -translate-x-full",
-                        bulkSendStatus === 'sending'
-                            ? "bg-gradient-to-r from-transparent via-amber-200/40 to-transparent"
-                            : "bg-gradient-to-r from-transparent via-emerald-200/40 to-transparent"
-                    )} style={{ animation: 'shimmer 2s infinite' }} />
 
-                    {bulkSendStatus === 'sending' ? (
-                        <>
-                            <Loader2 className="w-3.5 h-3.5 text-amber-600 animate-spin" />
-                            <span className="text-xs font-medium text-amber-700">Mesajlar gönderiliyor...</span>
-                            <span className="text-xs text-amber-500">🛡️ Spam korumalı</span>
-                        </>
-                    ) : (
-                        <>
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                            <span className="text-xs font-medium text-emerald-700">Tüm mesajlar başarıyla gönderildi!</span>
-                            <span className="text-xs text-emerald-500">{lastCompletionTime?.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</span>
-                        </>
-                    )}
-                </div>
-            )}
 
             {/* 3-Column Layout */}
             <div className="flex-1 grid grid-cols-12 min-h-0 divide-x divide-slate-100">
@@ -294,8 +367,10 @@ const WhatsAppPage = () => {
                     filteredLeads={filteredLeads}
                     selectedLeads={selectedLeads}
                     searchQuery={searchQuery}
+                    sentLeadIds={sentLeadIds}
                     onSearchChange={setSearchQuery}
                     onSelectLead={handleSelectLead}
+                    onSelectAll={handleSelectAll}
                 />
 
                 {/* COLUMN 2: Workspace / Producer */}
@@ -377,6 +452,18 @@ const WhatsAppPage = () => {
                                     </div>
                                 </div>
 
+                                {/* Duplicate Warning */}
+                                {duplicateWarning && (
+                                    <div className="mt-6 flex items-start gap-2.5 bg-red-50 border border-red-200 rounded-xl px-4 py-3 animate-in slide-in-from-top-2 duration-300">
+                                        <AlertTriangle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                                        <div className="flex-1">
+                                            <p className="text-xs font-semibold text-red-700">Duplikat Uyarısı</p>
+                                            <p className="text-[11px] text-red-600 mt-0.5 leading-relaxed">{duplicateWarning}</p>
+                                        </div>
+                                        <button onClick={() => setDuplicateWarning(null)} className="text-red-400 hover:text-red-600 text-xs font-bold">✕</button>
+                                    </div>
+                                )}
+
                                 <div className="mt-8 grid grid-cols-2 gap-4">
                                     <Button
                                         variant="outline"
@@ -418,8 +505,11 @@ const WhatsAppPage = () => {
                 <MessageQueue
                     queue={messageQueue}
                     isSending={isSending}
+                    todaySentCount={todaySentCount}
+                    totalSuccessRate={totalSuccessRate}
                     onClearQueue={handleClearQueue}
                     onRemoveItem={handleRemoveFromQueue}
+                    onRetryItem={handleRetryItem}
                     onSendQueue={handleSendQueue}
                 />
             </div>
