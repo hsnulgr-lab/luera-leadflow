@@ -9,10 +9,12 @@ interface MessageQueueProps {
     isSending: boolean;
     todaySentCount: number;
     totalSuccessRate: number;
+    activePreviewId: string | null;
     onClearQueue: () => void;
     onRemoveItem: (id: string) => void;
     onRetryItem: (id: string) => void;
     onSendQueue: () => void;
+    onPreviewItem: (id: string) => void;
 }
 
 export const MessageQueue = ({
@@ -20,11 +22,14 @@ export const MessageQueue = ({
     isSending,
     todaySentCount,
     totalSuccessRate,
+    activePreviewId,
     onClearQueue,
     onRemoveItem,
     onRetryItem,
-    onSendQueue
+    onSendQueue,
+    onPreviewItem
 }: MessageQueueProps) => {
+    const generatingCount = queue.filter(m => m.status === 'generating').length;
     const pendingCount = queue.filter(m => m.status === 'pending').length;
     const sentCount = queue.filter(m => m.status === 'sent').length;
     const failedCount = queue.filter(m => m.status === 'failed').length;
@@ -49,6 +54,9 @@ export const MessageQueue = ({
                 </div>
                 <div className="flex gap-2 text-xs font-medium text-slate-500">
                     <Badge variant="secondary" className="bg-slate-100 text-slate-600 border-0">{queue.length} Toplam</Badge>
+                    {generatingCount > 0 && (
+                        <Badge variant="secondary" className="bg-purple-50 text-purple-600 border-0 animate-pulse">{generatingCount} Oluşturuluyor</Badge>
+                    )}
                     <Badge variant="secondary" className="bg-orange-50 text-orange-600 border-0">{pendingCount} Bekleyen</Badge>
                     {sentCount > 0 && (
                         <Badge variant="secondary" className="bg-green-50 text-green-600 border-0">{sentCount} Gönderildi</Badge>
@@ -99,10 +107,13 @@ export const MessageQueue = ({
                     queue.map((item) => (
                         <div
                             key={item.id}
+                            onClick={() => onPreviewItem(item.id)}
                             className={cn(
-                                "bg-white p-4 rounded-xl border transition-all relative group overflow-hidden",
-                                item.status === 'sending' ? "border-blue-200 shadow-md ring-1 ring-blue-100" :
-                                    item.status === 'sent' ? "border-green-100 opacity-75" : "border-slate-100 hover:border-slate-200"
+                                "bg-white p-4 rounded-xl border transition-all relative group overflow-hidden cursor-pointer",
+                                activePreviewId === item.id ? "border-blue-300 ring-2 ring-blue-100 shadow-md" :
+                                    item.status === 'generating' ? "border-purple-200 shadow-sm ring-1 ring-purple-100" :
+                                        item.status === 'sending' ? "border-blue-200 shadow-md ring-1 ring-blue-100" :
+                                            item.status === 'sent' ? "border-green-100 opacity-75" : "border-slate-100 hover:border-slate-200"
                             )}
                         >
                             {item.status === 'sending' && (
@@ -133,6 +144,7 @@ export const MessageQueue = ({
                                         <Trash2 className="w-3.5 h-3.5" />
                                     </Button>
                                 )}
+                                {item.status === 'generating' && <Loader2 className="w-4 h-4 text-purple-500 animate-spin" />}
                                 {item.status === 'sent' && <CheckCircle2 className="w-5 h-5 text-green-500" />}
                                 {item.status === 'failed' && (
                                     <Button
@@ -146,7 +158,12 @@ export const MessageQueue = ({
                                     </Button>
                                 )}
                             </div>
-                            <p className="text-xs text-slate-600 line-clamp-2 pl-10 border-l-2 border-slate-100">
+                            <p className={cn(
+                                "text-xs line-clamp-2 pl-10 border-l-2",
+                                item.status === 'generating'
+                                    ? "text-purple-500 italic border-purple-200"
+                                    : "text-slate-600 border-slate-100"
+                            )}>
                                 {item.message}
                             </p>
                         </div>
@@ -183,7 +200,7 @@ export const MessageQueue = ({
                                 : "bg-slate-900 shadow-[0_0_30px_rgba(204,255,0,0.3)] hover:shadow-[0_0_50px_rgba(204,255,0,0.5)] hover:scale-[1.02] active:scale-[0.97]"
                         )}
                         onClick={onSendQueue}
-                        disabled={isSending || pendingCount === 0}
+                        disabled={isSending || pendingCount === 0 || generatingCount > 0}
                     >
                         {/* Scanning line sweep */}
                         {!isSending && pendingCount > 0 && (
