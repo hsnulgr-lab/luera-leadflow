@@ -1,0 +1,301 @@
+{
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "gokhan-ana-webhook",
+                "options": {}
+            },
+            "id": "16167100-7dd2-4523-8231-f49beb7acfd2",
+            "name": "Evolution Webhook",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+                -416,
+                144
+            ],
+            "webhookId": "ca18e249-739c-49cf-bb01-7cc68ce752f4"
+        },
+        {
+            "parameters": {
+                "dataType": "string",
+                "value1": "={{ $json.body.event }}",
+                "rules": {
+                    "rules": [
+                        {
+                            "value2": "qrcode.updated"
+                        },
+                        {
+                            "value2": "connection.update",
+                            "output": 1
+                        },
+                        {
+                            "value2": "messages.upsert",
+                            "output": 2
+                        }
+                    ]
+                },
+                "fallbackOutput": 3
+            },
+            "id": "9f6414cf-5e52-425e-b535-26c0b94d1a49",
+            "name": "Event Router",
+            "type": "n8n-nodes-base.switch",
+            "typeVersion": 1,
+            "position": [
+                -144,
+                112
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://supabasekong-pcwc808ogsgccgkw4o8sw808.lueratech.com/rest/v1/qr_codes",
+                "sendQuery": true,
+                "queryParameters": {
+                    "parameters": [
+                        {
+                            "name": "on_conflict",
+                            "value": "instance_name"
+                        }
+                    ]
+                },
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "apikey",
+                            "value": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc3MTE5NDk2MCwiZXhwIjo0OTI2ODY4NTYwLCJyb2xlIjoiYW5vbiJ9.Qs-1IvzdxQnXA6ALG797_hX-TvzBHVXN7oRiMMcre4M"
+                        },
+                        {
+                            "name": "Authorization",
+                            "value": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc3MTE5NDk2MCwiZXhwIjo0OTI2ODY4NTYwLCJyb2xlIjoiYW5vbiJ9.Qs-1IvzdxQnXA6ALG797_hX-TvzBHVXN7oRiMMcre4M"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        },
+                        {
+                            "name": "Prefer",
+                            "value": "resolution=merge-duplicates"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\n  \"instance_name\": \"{{ $json.body.instance }}\",\n  \"qr_base64\": \"{{ $json.body.data.qrcode.base64 }}\",\n  \"updated_at\": \"{{ $now.toISO() }}\"\n}",
+                "options": {}
+            },
+            "id": "94cbf2a4-55b3-46b2-9ee5-9bec89e784a6",
+            "name": "Save QR to Supabase",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                240,
+                -32
+            ]
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": "",
+                        "typeValidation": "strict"
+                    },
+                    "conditions": [
+                        {
+                            "id": "cond-open",
+                            "leftValue": "={{ $json.body.data.state }}",
+                            "rightValue": "open",
+                            "operator": {
+                                "type": "string",
+                                "operation": "equals"
+                            }
+                        }
+                    ],
+                    "combinator": "and"
+                },
+                "options": {}
+            },
+            "id": "e29da4c7-32f0-4709-a7f5-872fbc058019",
+            "name": "Is Connected?",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2,
+            "position": [
+                112,
+                208
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://supabasekong-pcwc808ogsgccgkw4o8sw808.lueratech.com/rest/v1/qr_codes",
+                "sendQuery": true,
+                "queryParameters": {
+                    "parameters": [
+                        {
+                            "name": "on_conflict",
+                            "value": "instance_name"
+                        }
+                    ]
+                },
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "apikey",
+                            "value": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc3MTE5NDk2MCwiZXhwIjo0OTI2ODY4NTYwLCJyb2xlIjoiYW5vbiJ9.Qs-1IvzdxQnXA6ALG797_hX-TvzBHVXN7oRiMMcre4M"
+                        },
+                        {
+                            "name": "Authorization",
+                            "value": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc3MTE5NDk2MCwiZXhwIjo0OTI2ODY4NTYwLCJyb2xlIjoiYW5vbiJ9.Qs-1IvzdxQnXA6ALG797_hX-TvzBHVXN7oRiMMcre4M"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        },
+                        {
+                            "name": "Prefer",
+                            "value": "resolution=merge-duplicates"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\n  \"instance_name\": \"{{ $json.body.instance }}\",\n  \"qr_base64\": null,\n  \"updated_at\": \"{{ $now.toISO() }}\"\n}",
+                "options": {}
+            },
+            "id": "cb3928a4-e443-4070-80fd-dcf981ce4298",
+            "name": "Clear QR",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                384,
+                208
+            ]
+        },
+        {
+            "parameters": {
+                "url": "={{ 'https://evolotion2.lueratech.com/instance/connect/' + $json.body.instanceName }}",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "apikey",
+                            "value": "B40383178FF7-46B8-9573-FE9D12AB9AF5"
+                        }
+                    ]
+                },
+                "options": {
+                    "allowUnauthorizedCerts": true
+                }
+            },
+            "id": "5de91640-460b-48ce-a21d-63702b4d8b19",
+            "name": "Evolution API Connect",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                -240,
+                496
+            ]
+        },
+        {
+            "parameters": {
+                "options": {}
+            },
+            "id": "287d21c8-ec62-484c-94ba-dec6a67d4f04",
+            "name": "Respond to Webhook",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1,
+            "position": [
+                -32,
+                496
+            ]
+        },
+        {
+            "parameters": {
+                "workflowId": "BURAYA_AI_CHATBOT_WORKFLOW_ID_GELECEK",
+                "options": {
+                    "waitForSubWorkflow": false
+                }
+            },
+            "id": "chatbot-trigger-node-id",
+            "name": "Execute AI Chatbot Trigger",
+            "type": "n8n-nodes-base.executeWorkflow",
+            "typeVersion": 1,
+            "position": [
+                112,
+                384
+            ]
+        }
+    ],
+    "connections": {
+        "Evolution Webhook": {
+            "main": [
+                [
+                    {
+                        "node": "Event Router",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "Evolution API Connect",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Event Router": {
+            "main": [
+                [
+                    {
+                        "node": "Save QR to Supabase",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Is Connected?",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Execute AI Chatbot Trigger",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Is Connected?": {
+            "main": [
+                [
+                    {
+                        "node": "Clear QR",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Evolution API Connect": {
+            "main": [
+                [
+                    {
+                        "node": "Respond to Webhook",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "pinData": {},
+    "meta": {
+        "instanceId": "cdff0445899da88f2bd87cd11999f662983047f1a677170d82f62cebe2eb3755"
+    }
+}

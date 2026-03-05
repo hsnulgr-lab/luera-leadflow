@@ -8,7 +8,7 @@ interface QRCodeData {
     updated_at: string;
 }
 
-export function useQRCode(instanceName: string = "testwp") {
+export function useQRCode(instanceName: string = "gokhan") {
     const [qrCode, setQrCode] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -41,19 +41,19 @@ export function useQRCode(instanceName: string = "testwp") {
             if (data) {
                 const qrData = data as QRCodeData;
 
-                // Check if this is a relatively fresh QR code (updated in last 15 minutes)
-                // We use 15 minutes to account for server/browser time sync differences
+                // Check if this is a relatively fresh QR code (updated in last 75 seconds)
+                // We use 75 seconds to strictly enforce the QR code validity window
                 const updatedAt = new Date(qrData.updated_at);
                 const timeDiff = Date.now() - updatedAt.getTime();
-                const threeMinutes = 3 * 60 * 1000;
+                const seventyFiveSeconds = 75 * 1000;
 
-                if (timeDiff < threeMinutes) {
+                if (timeDiff < seventyFiveSeconds) {
                     console.log("[useQRCode] Fresh QR code found!", qrData.updated_at);
                     setQrCode(qrData.qr_base64);
                     setLastUpdated(updatedAt);
                     return qrData.qr_base64;
                 } else {
-                    console.log("[useQRCode] QR code is stale (older than 3 mins), ignoring");
+                    console.log("[useQRCode] QR code is stale (older than 75 secs), ignoring");
                     setQrCode(null);
                     return null;
                 }

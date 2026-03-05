@@ -44,6 +44,23 @@ export default defineConfig(({ mode }) => {
     }
   }
 
+  // Evolution API Proxy to bypass SSL / CORS
+  const evoUrl = env.VITE_EVOLUTION_API_URL;
+  if (evoUrl) {
+    try {
+      const url = new URL(evoUrl);
+      proxy['/api/evolution'] = {
+        target: url.origin,
+        changeOrigin: true,
+        secure: false, // Bypass SSL verification (Fixes ERR_CERT_AUTHORITY_INVALID)
+        rewrite: (path) => path.replace(/^\/api\/evolution/, ''),
+      };
+      console.log(`Proxying /api/evolution to ${url.origin}`);
+    } catch (e) {
+      console.warn("Invalid VITE_EVOLUTION_API_URL in .env, Evolution proxy not configured.");
+    }
+  }
+
   return {
     plugins: [react()],
     resolve: {

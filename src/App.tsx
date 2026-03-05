@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { NotificationProvider } from "./contexts/NotificationContext";
+import { LeadProvider } from "./contexts/LeadContext";
+import { WhatsAppProvider } from "./contexts/WhatsAppContext";
 import { LoginPage } from "./pages/LoginPage";
 import { Layout } from "./components/layout/Layout";
 import { DashboardPage } from "./pages/DashboardPage";

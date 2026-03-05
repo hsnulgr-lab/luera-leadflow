@@ -2,15 +2,16 @@ import { createContext, useContext, useState, useEffect, useCallback, ReactNode 
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { Notification, NotificationType } from '@/types/notification';
+import { toast } from 'sonner';
 
 interface NotificationContextType {
     notifications: Notification[];
     unreadCount: number;
     isLoading: boolean;
     addNotification: (type: NotificationType, title: string, message: string, leadId?: string) => Promise<void>;
-    markAsRead: (id: string) => Promise<void>;
+    markAsRead: (id: string, e?: React.MouseEvent) => Promise<void>;
     markAllAsRead: () => Promise<void>;
-    clearNotification: (id: string) => Promise<void>;
+    clearNotification: (id: string, e?: React.MouseEvent) => Promise<void>;
     clearAll: () => Promise<void>;
 }
 
@@ -59,7 +60,53 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
 
     useEffect(() => {
         fetchNotifications();
-    }, [fetchNotifications]);
+
+        if (!user) return;
+
+        // Subscribe to real-time notifications inserts (e.g., from n8n webhooks)
+        const subscription = supabase
+            .channel('public:notifications')
+            .on(
+                'postgres_changes',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'notifications'
+                },
+                (payload) => {
+                    const newRecord = payload.new;
+
+                    const newNote: Notification = {
+                        id: newRecord.id,
+                        type: (newRecord.type || 'success') as NotificationType,
+                        title: newRecord.title,
+                        message: newRecord.message || '',
+                        timestamp: new Date(newRecord.created_at),
+                        read: newRecord.read || false,
+                        leadId: newRecord.lead_id,
+                    };
+
+                    setNotifications(prev => [newNote, ...prev]);
+
+                    // Trigger a toast for the user
+                    if (newNote.type === 'success') {
+                        toast.success(newNote.title, { description: newNote.message });
+                    } else if (newNote.type === 'error') {
+                        toast.error(newNote.title, { description: newNote.message });
+                    } else if (newNote.type === 'automation') {
+                        toast.info(newNote.title, { description: newNote.message });
+                    } else {
+                        // For WhatsApp updates or system messages
+                        toast(newNote.title, { description: newNote.message });
+                    }
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(subscription);
+        };
+    }, [fetchNotifications, user]);
 
     const addNotification = useCallback(async (
         type: NotificationType,

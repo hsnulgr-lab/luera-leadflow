@@ -55,7 +55,7 @@ const WhatsAppPage = () => {
     const [editingQueueMessage, setEditingQueueMessage] = useState(false);
     const [editedMessage, setEditedMessage] = useState("");
 
-    const INSTANCE_NAME = "testwp";
+    const INSTANCE_NAME = "gokhan";
     const { qrCode, clearQRCode } = useQRCode(INSTANCE_NAME);
     const { sentLeadIds, sentRecords, markAsSent, wasSent, getSentFromList } = useSentHistory();
 
