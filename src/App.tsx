@@ -14,6 +14,9 @@ import { Loader2 } from "lucide-react";
 
 import { ErrorBoundary } from "./components/common/ErrorBoundary";
 
+import { LeadProvider } from "./contexts/LeadContext";
+import { WhatsAppProvider } from "./contexts/WhatsAppContext";
+
 // Protected Route Component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     const { isAuthenticated, isLoading } = useAuth();
@@ -33,7 +36,13 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
         return <Navigate to="/login" replace />;
     }
 
-    return <>{children}</>;
+    return (
+        <LeadProvider>
+            <WhatsAppProvider>
+                {children}
+            </WhatsAppProvider>
+        </LeadProvider>
+    );
 };
 
 const App = () => {

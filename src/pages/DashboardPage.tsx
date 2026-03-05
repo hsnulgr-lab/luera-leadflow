@@ -9,8 +9,10 @@ import { useLeads } from "@/hooks/useLeads";
 import { ScheduleConfig, Lead } from "@/types/lead";
 import { Users, Target, Send, TrendingUp, CheckCircle2, Loader2, Sparkles, Coffee, Lightbulb, BarChart3, MessageCircle, Zap } from "lucide-react";
 import { cn } from "@/utils/cn";
+import { useAuth } from "@/contexts/AuthContext";
 
 export const DashboardPage = () => {
+    const { user } = useAuth();
     const [scheduleConfig, setScheduleConfig] = useState<ScheduleConfig>({
         date: undefined,
         time: "",
@@ -59,9 +61,9 @@ export const DashboardPage = () => {
 
     // Independent timers — different speeds so they don't feel robotic
     useEffect(() => {
-        const t1 = setInterval(() => setSlide1(p => p + 1), 6000);   // 6s
-        const t2 = setInterval(() => setSlide2(p => p + 1), 8000);   // 8s
-        const t3 = setInterval(() => setSlide3(p => p + 1), 10000);  // 10s
+        const t1 = setInterval(() => setSlide1(p => p + 1), 12000);  // 12s
+        const t2 = setInterval(() => setSlide2(p => p + 1), 16000);  // 16s
+        const t3 = setInterval(() => setSlide3(p => p + 1), 20000);  // 20s
         return () => { clearInterval(t1); clearInterval(t2); clearInterval(t3); };
     }, []);
 
@@ -92,69 +94,60 @@ export const DashboardPage = () => {
 
                 {/* Stats Bar */}
                 <div className="flex gap-4 mb-6">
-                    {/* Toplam Lead — rotating carousel */}
+                    {/* CARD 1: Greeting + Lead Snapshot — rotating carousel */}
                     {(() => {
                         const hour = new Date().getHours();
-                        const greeting = hour < 12 ? 'Günaydın' : hour < 18 ? 'İyi günler' : 'İyi akşamlar';
+                        const greeting = hour < 6 ? 'İyi geceler' : hour < 12 ? 'Günaydın' : hour < 18 ? 'İyi günler' : 'İyi akşamlar';
+                        const leadsWithPhone = leads.filter(l => l.phone && l.phone.length > 3).length;
+                        const leadsNoPhone = leads.length - leadsWithPhone;
+                        const phoneRate = leads.length > 0 ? Math.round((leadsWithPhone / leads.length) * 100) : 0;
                         const slides = [
                             {
-                                icon: <Users className="w-4 h-4 text-[#CCFF00]" />,
-                                label: 'TOPLAM LEAD',
-                                value: <>{leads.length}</>,
-                                sub: <><TrendingUp className="w-3 h-3 text-green-500" /><span className="text-xs font-medium text-green-600">+12% bu hafta</span></>,
+                                icon: <Coffee className="w-4 h-4 text-[#CCFF00]" />,
+                                label: 'LUERA AI',
+                                value: <span className="text-xl">{greeting}, <span className="capitalize">{user?.name || 'Kullanıcı'}</span> 👋</span>,
+                                sub: <span className="text-xs text-gray-400">{leads.length > 0 ? `Sizin için ${leads.length} potansiyel müşteri hazırladım.` : 'Yeni fırsatlar bulmak için arama başlatın.'}</span>,
                             },
                             {
-                                icon: <Coffee className="w-4 h-4 text-[#CCFF00]" />,
-                                label: 'LUERA',
-                                value: <span className="text-xl">{greeting}, Furkan 👋</span>,
-                                sub: <span className="text-xs text-gray-400">Bugün harika bir gün olacak</span>,
+                                icon: <Users className="w-4 h-4 text-[#CCFF00]" />,
+                                label: 'MÜŞTERİ PORTFÖYÜ',
+                                value: <>{leads.length}</>,
+                                sub: <><TrendingUp className="w-3 h-3 text-green-500" /><span className="text-xs font-medium text-green-600">{leadsWithPhone} doğrulanmış numara • {leadsNoPhone} eksik</span></>,
+                            },
+                            {
+                                icon: <Target className="w-4 h-4 text-[#CCFF00]" />,
+                                label: 'İLETİŞİM GÜCÜ',
+                                value: <span className="text-2xl">%{phoneRate}</span>,
+                                sub: <span className="text-xs text-gray-400">Portföyünüzün %{phoneRate}'i WhatsApp gönderimine uygun.</span>,
                             },
                             {
                                 icon: <Lightbulb className="w-4 h-4 text-[#CCFF00]" />,
-                                label: 'ÖNERİ',
-                                value: <span className="text-base">Veteriner sektörünü denedin mi?</span>,
-                                sub: <span className="text-xs text-gray-400">Rakipler henüz bu alanda değil</span>,
-                            },
-                            {
-                                icon: <BarChart3 className="w-4 h-4 text-[#CCFF00]" />,
-                                label: 'SİSTEM BİLGİSİ',
-                                value: <span className="text-base">Bu hafta {leads.length} lead topladın</span>,
-                                sub: <><Sparkles className="w-3 h-3 text-purple-500" /><span className="text-xs font-medium text-purple-600">Harika performans!</span></>,
+                                label: 'YAPAY ZEKA',
+                                value: <span className="text-xl">{pendingCount > 0 ? "Aksiyon Gerekli" : sentCount > 0 ? "Görev Tamamlandı" : "Asistan Beklemede"}</span>,
+                                sub: <><Sparkles className="w-3 h-3 text-purple-500 shrink-0 mt-0.5" /><span className="text-xs font-medium text-purple-600 line-clamp-2">{pendingCount > 0 ? `${pendingCount} adet taslak oluşturuldu, gönderim onayı bekliyor.` : sentCount > 0 ? 'Hedef kilitlendi. Ağınızı büyütmek için yeni bir tarama başlatın.' : 'Asistanınız yeni hedef belirlemenizi bekliyor.'}</span></>,
                             },
                         ];
                         const slide = slides[slide1 % slides.length];
                         return (
                             <div className="flex-1 min-w-0 group relative rounded-2xl p-5 bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden">
-                                {/* Slide dots */}
                                 <div className="absolute top-2.5 right-5 flex gap-1">
                                     {slides.map((_, i) => (
-                                        <div
-                                            key={i}
-                                            className={cn(
-                                                "w-1.5 h-1.5 rounded-full transition-all duration-300",
-                                                i === slide1 % slides.length ? "bg-slate-900 w-3" : "bg-gray-300"
-                                            )}
-                                        />
+                                        <div key={i} className={cn("w-1.5 h-1.5 rounded-full transition-all duration-300", i === slide1 % slides.length ? "bg-slate-900 w-3" : "bg-gray-300")} />
                                     ))}
                                 </div>
-                                <div className="relative h-[88px]">
+                                <div className="relative h-[110px]">
                                     <div key={slide1} className="absolute inset-0 animate-slideUp">
                                         <div className="flex items-center justify-between mb-3">
-                                            <p className="text-[11px] font-semibold text-gray-400 tracking-wider uppercase">{slide.label}</p>
-                                            <div className="p-2.5 rounded-xl bg-slate-900">
-                                                {slide.icon}
-                                            </div>
+                                            <p className="text-[11px] font-semibold text-gray-400 tracking-wider uppercase truncate pr-4">{slide.label}</p>
+                                            <div className="p-2.5 rounded-xl bg-slate-900 shrink-0">{slide.icon}</div>
                                         </div>
-                                        <h3 className="text-3xl font-bold text-gray-900 tracking-tight whitespace-nowrap">{slide.value}</h3>
-                                        <div className="mt-2 flex items-center gap-1 whitespace-nowrap">{slide.sub}</div>
+                                        <h3 className="text-2xl font-bold text-gray-900 tracking-tight truncate">{slide.value}</h3>
+                                        <div className="mt-2 flex items-start gap-1.5 line-clamp-2 leading-snug break-words whitespace-normal">{slide.sub}</div>
                                     </div>
                                 </div>
                                 <style>{`
-                                    @keyframes slideUp {
-                                        0% { opacity: 0; transform: translateY(12px); }
-                                        100% { opacity: 1; transform: translateY(0); }
-                                    }
-                                    .animate-slideUp { animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+                                    @keyframes slideUp { 0% { opacity: 0; transform: translateY(12px); } 100% { opacity: 1; transform: translateY(0); } }
+                                    .animate-slideUp { animation: slideUp 0.5s cubic-bezier(0.16,1,0.3,1) forwards; }
                                 `}</style>
                             </div>
                         );
@@ -303,28 +296,37 @@ export const DashboardPage = () => {
                         `}</style>
                     </div>
 
-                    {/* Gönderilen Mesaj — rotating carousel */}
+                    {/* CARD 2: Messaging Stats — rotating carousel */}
                     {(() => {
+                        const totalMessages = sentCount + pendingCount;
                         const msgSlides = [
                             {
                                 icon: <Send className="w-4 h-4 text-[#CCFF00]" />,
-                                label: 'GÖNDERİLEN MESAJ',
+                                label: 'İLETİŞİM RAPORU',
                                 value: <>{sentCount}</>,
                                 sub: sentCount > 0
-                                    ? <><TrendingUp className="w-3 h-3 text-green-500" /><span className="text-xs font-medium text-green-600">+8% artış</span></>
-                                    : <span className="text-xs font-medium text-gray-400">Henüz mesaj yok</span>,
+                                    ? <><CheckCircle2 className="w-3 h-3 text-green-500" /><span className="text-xs font-medium text-green-600">{sentCount} işletmeye başarıyla ulaşıldı.</span></>
+                                    : <span className="text-xs font-medium text-gray-400">Henüz bir mesajlaşma başlatılmadı.</span>,
                             },
                             {
                                 icon: <MessageCircle className="w-4 h-4 text-[#CCFF00]" />,
-                                label: 'İLETİŞİM',
-                                value: <span className="text-base">WhatsApp üzerinden ulaşın</span>,
-                                sub: <span className="text-xs text-gray-400">Otomatik mesajlaşma aktif</span>,
+                                label: 'BEKLEYEN İŞLEMLER',
+                                value: <>{pendingCount > 0 ? pendingCount : '—'}</>,
+                                sub: pendingCount > 0
+                                    ? <><Zap className="w-3 h-3 text-amber-500" /><span className="text-xs font-medium text-amber-600">Sırada {pendingCount} mesaj gönderilmeyi bekliyor.</span></>
+                                    : <span className="text-xs text-gray-400">Şu anda kuyruk boş, yeni mesajlar oluşturabilirsiniz.</span>,
                             },
                             {
                                 icon: <Zap className="w-4 h-4 text-[#CCFF00]" />,
-                                label: 'HIZLI İPUCU',
-                                value: <span className="text-base">Kişisel mesajlar %40 etkili</span>,
-                                sub: <><Sparkles className="w-3 h-3 text-amber-500" /><span className="text-xs font-medium text-amber-600">AI ile özelleştir</span></>,
+                                label: 'HAREKET ÖZETİ',
+                                value: <>{totalMessages}</>,
+                                sub: <><BarChart3 className="w-3 h-3 text-blue-500" /><span className="text-xs font-medium text-blue-600">{sentCount} teslim edildi • {pendingCount} işleniyor</span></>,
+                            },
+                            {
+                                icon: <Sparkles className="w-4 h-4 text-[#CCFF00]" />,
+                                label: 'SATIŞ İPUCU',
+                                value: <span className="text-xl">Dönüşüm +%40</span>,
+                                sub: <><Lightbulb className="w-3 h-3 text-amber-500 shrink-0 mt-0.5" /><span className="text-xs font-medium text-amber-600 line-clamp-2">Özelleştirilmiş mesajlar sayesinde potansiyellerinizi ciddi oranda artırın.</span></>,
                             },
                         ];
                         const idx = slide2 % msgSlides.length;
@@ -333,46 +335,47 @@ export const DashboardPage = () => {
                             <div className="flex-1 min-w-0 group relative rounded-2xl p-5 bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden">
                                 <div className="absolute top-2.5 right-5 flex gap-1">
                                     {msgSlides.map((_, i) => (
-                                        <div key={i} className={cn(
-                                            "w-1.5 h-1.5 rounded-full transition-all duration-300",
-                                            i === idx ? "bg-slate-900 w-3" : "bg-gray-300"
-                                        )} />
+                                        <div key={i} className={cn("w-1.5 h-1.5 rounded-full transition-all duration-300", i === idx ? "bg-slate-900 w-3" : "bg-gray-300")} />
                                     ))}
                                 </div>
-                                <div className="relative h-[88px]">
+                                <div className="relative h-[110px]">
                                     <div key={slide2} className="absolute inset-0 animate-slideUp">
                                         <div className="flex items-center justify-between mb-3">
-                                            <p className="text-[11px] font-semibold text-gray-400 tracking-wider uppercase">{slide.label}</p>
-                                            <div className="p-2.5 rounded-xl bg-slate-900">{slide.icon}</div>
+                                            <p className="text-[11px] font-semibold text-gray-400 tracking-wider uppercase truncate pr-4">{slide.label}</p>
+                                            <div className="p-2.5 rounded-xl bg-slate-900 shrink-0">{slide.icon}</div>
                                         </div>
-                                        <h3 className="text-3xl font-bold text-gray-900 tracking-tight whitespace-nowrap">{slide.value}</h3>
-                                        <div className="mt-2 flex items-center gap-1 whitespace-nowrap">{slide.sub}</div>
+                                        <h3 className="text-2xl font-bold text-gray-900 tracking-tight truncate">{slide.value}</h3>
+                                        <div className="mt-2 flex items-start gap-1.5 line-clamp-2 leading-snug break-words whitespace-normal">{slide.sub}</div>
                                     </div>
                                 </div>
                             </div>
                         );
                     })()}
 
-                    {/* Dönüşüm Oranı — rotating carousel, shrinks during automation */}
+                    {/* CARD 3: Performance Stats — rotating carousel, hides during automation */}
                     {(() => {
+                        const convRate = leads.length > 0 ? Math.round((sentCount / leads.length) * 100) : 0;
+                        const efficiency = leads.length > 0 ? Math.round((sentCount / leads.length) * 100) : 0;
                         const convSlides = [
                             {
                                 icon: <TrendingUp className="w-4 h-4 text-[#CCFF00]" />,
-                                label: 'DÖNÜŞÜM ORANI',
-                                value: <>23%</>,
-                                sub: <><TrendingUp className="w-3 h-3 text-green-500" /><span className="text-xs font-medium text-green-600">+5% bu ay</span></>,
+                                label: 'AĞ GENİŞLETMESİ',
+                                value: <>%{convRate}</>,
+                                sub: convRate > 50
+                                    ? <><CheckCircle2 className="w-3 h-3 text-green-500" /><span className="text-xs font-medium text-green-600">Hedef kitleye hızla ulaşıyoruz!</span></>
+                                    : <><TrendingUp className="w-3 h-3 text-amber-500" /><span className="text-xs font-medium text-amber-600">{leads.length - sentCount} yeni temas noktamız var.</span></>,
                             },
                             {
-                                icon: <Target className="w-4 h-4 text-[#CCFF00]" />,
-                                label: 'HEDEF',
-                                value: <span className="text-base">Aylık hedef: %30 dönüşüm</span>,
-                                sub: <span className="text-xs text-gray-400">%77 tamamlandı</span>,
+                                icon: <BarChart3 className="w-4 h-4 text-[#CCFF00]" />,
+                                label: 'ERİŞİM ORANI',
+                                value: <span className="text-2xl">%{efficiency}</span>,
+                                sub: <><Target className="w-3 h-3 text-blue-500" /><span className="text-xs font-medium text-blue-600">{leads.length} fırsattan {sentCount} tanesiyle temasa geçildi.</span></>,
                             },
                             {
                                 icon: <Sparkles className="w-4 h-4 text-[#CCFF00]" />,
-                                label: 'PERFORMANS',
-                                value: <span className="text-base">En iyi sektör: Diş Kliniği</span>,
-                                sub: <><BarChart3 className="w-3 h-3 text-blue-500" /><span className="text-xs font-medium text-blue-600">%45 dönüşüm oranı</span></>,
+                                label: 'MOTOR DURUMU',
+                                value: <span className="text-xl">{pendingCount > 0 ? 'İşlemde' : sentCount > 0 ? 'Tamamlandı' : 'Beklemede'}</span>,
+                                sub: <span className="text-xs text-gray-400 line-clamp-2">{pendingCount > 0 ? `Satış asistanınız arka planda ${pendingCount} işlemi hızla yürütüyor...` : 'Sistem herhangi bir göreve tam kapasite hazır.'}</span>,
                             },
                         ];
                         const idx = slide3 % convSlides.length;
@@ -388,20 +391,17 @@ export const DashboardPage = () => {
                             >
                                 <div className="absolute top-2.5 right-5 flex gap-1">
                                     {convSlides.map((_, i) => (
-                                        <div key={i} className={cn(
-                                            "w-1.5 h-1.5 rounded-full transition-all duration-300",
-                                            i === idx ? "bg-slate-900 w-3" : "bg-gray-300"
-                                        )} />
+                                        <div key={i} className={cn("w-1.5 h-1.5 rounded-full transition-all duration-300", i === idx ? "bg-slate-900 w-3" : "bg-gray-300")} />
                                     ))}
                                 </div>
-                                <div className="relative h-[88px]">
+                                <div className="relative h-[110px]">
                                     <div key={slide3} className="absolute inset-0 animate-slideUp">
                                         <div className="flex items-center justify-between mb-3">
-                                            <p className="text-[11px] font-semibold text-gray-400 tracking-wider uppercase whitespace-nowrap">{slide.label}</p>
-                                            <div className="p-2.5 rounded-xl bg-slate-900">{slide.icon}</div>
+                                            <p className="text-[11px] font-semibold text-gray-400 tracking-wider uppercase truncate pr-4">{slide.label}</p>
+                                            <div className="p-2.5 rounded-xl bg-slate-900 shrink-0">{slide.icon}</div>
                                         </div>
-                                        <h3 className="text-3xl font-bold text-gray-900 tracking-tight whitespace-nowrap">{slide.value}</h3>
-                                        <div className="mt-2 flex items-center gap-1 whitespace-nowrap">{slide.sub}</div>
+                                        <h3 className="text-2xl font-bold text-gray-900 tracking-tight truncate">{slide.value}</h3>
+                                        <div className="mt-2 flex items-start gap-1.5 line-clamp-2 leading-snug break-words whitespace-normal">{slide.sub}</div>
                                     </div>
                                 </div>
                             </div>

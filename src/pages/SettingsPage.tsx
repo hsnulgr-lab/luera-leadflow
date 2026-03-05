@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { User, Bell, Globe, Key, Webhook, Save, CheckCircle2 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 export const SettingsPage = () => {
+    const { user } = useAuth();
     const [activeTab, setActiveTab] = useState("profile");
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState(false);
@@ -13,8 +15,8 @@ export const SettingsPage = () => {
     const [geminiKey, setGeminiKey] = useState("");
 
     // General State
-    const [profileName, setProfileName] = useState("Furkan Ulger");
-    const [email, setEmail] = useState("furkan@lueratech.com");
+    const [profileName, setProfileName] = useState(user?.name || "");
+    const [email, setEmail] = useState(user?.email || "");
     const [theme, setTheme] = useState("light");
 
     // Notifications State
@@ -38,7 +40,13 @@ export const SettingsPage = () => {
         setN8nSearchUrl(storedSearchUrl);
         setN8nAgentUrl(storedAgentUrl);
         setGeminiKey(storedGeminiKey);
-    }, []);
+
+        // Update local state if user context is available
+        if (user) {
+            setProfileName(user.name || "");
+            setEmail(user.email || "");
+        }
+    }, [user]);
 
     const handleSave = () => {
         setLoading(true);

@@ -19,6 +19,7 @@ import { n8nEvolutionService } from "@/services/n8nEvolutionService";
 import { useLeads } from "@/hooks/useLeads";
 import { useQRCode } from "@/hooks/useQRCode";
 import { useSentHistory } from "@/hooks/useSentHistory";
+import { useWhatsApp } from "@/contexts/WhatsAppContext";
 import { cn } from "@/utils/cn";
 import { Badge } from "@/components/ui/badge";
 
@@ -35,15 +36,19 @@ const WhatsAppPage = () => {
     // UI State
     const [connectionStatus, setConnectionStatus] = useState<"connected" | "disconnected" | "connecting">("disconnected");
     const [selectedLeads, setSelectedLeads] = useState<Lead[]>([]);
-    const [messageQueue, setMessageQueue] = useState<MessageQueueItem[]>([]);
-    const [isSending, setIsSending] = useState(false);
+    const {
+        messageQueue,
+        setMessageQueue,
+        isSending,
+        bulkSendStatus,
+        handleSendQueue: handleSendQueueContext,
+        handleAddToQueue: handleAddToQueueContext
+    } = useWhatsApp();
     const [previewMessage, setPreviewMessage] = useState<string>("");
     const [previewLead, setPreviewLead] = useState<Lead | null>(null);
     const [isPreviewLoading, setIsPreviewLoading] = useState(false);
     const [isQRModalOpen, setIsQRModalOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
-    const [bulkSendStatus, setBulkSendStatus] = useState<"idle" | "sending" | "completed">("idle");
-    const [lastCompletionTime, setLastCompletionTime] = useState<Date | null>(null);
     const [isEditing, setIsEditing] = useState(false);
     const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
     const [previewQueueItemId, setPreviewQueueItemId] = useState<string | null>(null);
@@ -67,6 +72,25 @@ const WhatsAppPage = () => {
         }
     }, [connectionStatus]);
 
+    // 75-Second QR Code Timeout Logic
+    useEffect(() => {
+        let timeoutId: NodeJS.Timeout;
+
+        if (qrCode && connectionStatus === "connecting") {
+            // When QR code is displayed to the user, start a 75-second timer
+            timeoutId = setTimeout(() => {
+                console.log("[WhatsAppPage] QR code expired after 75 seconds. Resetting UI.");
+                clearQRCode();
+                // Reset connection status so the user can generate a new one
+                setConnectionStatus("disconnected");
+            }, 75000); // 75 seconds
+        }
+
+        return () => {
+            if (timeoutId) clearTimeout(timeoutId);
+        };
+    }, [qrCode, connectionStatus, clearQRCode]);
+
     // Load state from local storage on mount
     useEffect(() => {
         const storedLeads = localStorage.getItem("whatsapp_selected_leads");
@@ -81,55 +105,7 @@ const WhatsAppPage = () => {
         localStorage.setItem("whatsapp_selected_leads", JSON.stringify(selectedLeads));
     }, [selectedLeads]);
 
-    useEffect(() => {
-        localStorage.setItem("whatsapp_message_queue", JSON.stringify(messageQueue));
-    }, [messageQueue]);
 
-    // Listen for bulk send completion notifications from Supabase
-    useEffect(() => {
-        const channel = supabase
-            .channel('whatsapp-completion-notifications')
-            .on(
-                'postgres_changes',
-                {
-                    event: 'INSERT',
-                    schema: 'public',
-                    table: 'notifications'
-                },
-                (payload) => {
-                    const notification = payload.new as { title: string; message: string };
-                    if (notification.title.includes('Tamamlandı')) {
-                        setBulkSendStatus('completed');
-                        setLastCompletionTime(new Date());
-
-                        // Reset status after 20 seconds
-                        setTimeout(() => {
-                            setBulkSendStatus('idle');
-                        }, 20000);
-                    }
-                }
-            )
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
-    }, []);
-
-    // Fail-safe: Automatically complete status when queue is empty of active items
-    useEffect(() => {
-        if (bulkSendStatus === 'sending') {
-            const hasActiveItems = messageQueue.some(item => item.status === 'pending' || item.status === 'sending');
-            if (!hasActiveItems) {
-                const timer = setTimeout(() => {
-                    setBulkSendStatus('completed');
-                    setLastCompletionTime(new Date());
-                    setTimeout(() => setBulkSendStatus('idle'), 5000);
-                }, 1000);
-                return () => clearTimeout(timer);
-            }
-        }
-    }, [messageQueue, bulkSendStatus]);
 
     const { leads: realLeads } = useLeads();
     const offerType = "yapay zeka çözümleri ile işletmenizi büyütme";
@@ -218,69 +194,14 @@ const WhatsAppPage = () => {
             return;
         }
 
-        // Önce "generating" durumunda kuyruğa ekle
-        const newQueue = newLeads.map(lead => ({
-            id: crypto.randomUUID(),
-            lead,
-            message: "Yapay zeka mesaj oluşturuyor... 🤖",
-            status: "generating" as const
-        }));
-
-        setMessageQueue(prev => [...prev, ...newQueue]);
+        handleAddToQueueContext(newLeads, offerType);
         setSelectedLeads([]);
         setPreviewLead(null);
         setPreviewMessage("");
-
-        // Her lead için AI mesaj üret
-        for (const item of newQueue) {
-            n8nEvolutionService.generateMessage(item.lead.name, offerType)
-                .then(message => {
-                    setMessageQueue(prev => prev.map(q =>
-                        q.id === item.id ? { ...q, message, status: "pending" as const } : q
-                    ));
-                })
-                .catch(() => {
-                    setMessageQueue(prev => prev.map(q =>
-                        q.id === item.id
-                            ? { ...q, message: `Merhaba ${item.lead.name}! 🚀 ${offerType} hakkında görüşmek isteriz.`, status: "pending" as const }
-                            : q
-                    ));
-                });
-        }
-
     };
 
     const handleSendQueue = async () => {
-        setIsSending(true);
-
-        const pendingItems = messageQueue.filter(item => item.status === 'pending');
-        if (pendingItems.length === 0) {
-            setIsSending(false);
-
-            return;
-        }
-
-        try {
-            setMessageQueue(prev => prev.map(msg => msg.status === 'pending' ? { ...msg, status: 'sending' } : msg));
-            setBulkSendStatus('sending');
-
-
-            const result = await n8nEvolutionService.sendBulkMessages(pendingItems);
-
-            if (result.success) {
-                setMessageQueue(prev => prev.map(msg => msg.status === 'sending' ? { ...msg, status: 'sent' } : msg));
-                // Kalıcı gönderim kaydı
-                await markAsSent(pendingItems.map(item => ({ id: item.lead.id, name: item.lead.name })));
-            } else {
-                throw new Error("Bulk send failed");
-            }
-        } catch (error) {
-            console.error("Queue send error:", error);
-            setMessageQueue(prev => prev.map(msg => msg.status === 'sending' ? { ...msg, status: 'failed' } : msg));
-
-        } finally {
-            setIsSending(false);
-        }
+        await handleSendQueueContext();
     };
 
     const handleClearQueue = () => {

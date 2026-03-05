@@ -1,7 +1,8 @@
-import { X, Mail, Phone, Calendar, Building, Tag, Target, MessageCircle, Globe, ExternalLink, ArrowUpRight } from "lucide-react";
+import { X, Mail, Phone, Calendar, Building, Tag, Target, MessageCircle, Globe, ExternalLink, ArrowUpRight, Trash2 } from "lucide-react";
 import { Lead } from "@/types/lead";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/utils/cn";
+import { useLeads } from "@/hooks/useLeads";
 
 interface LeadDetailPanelProps {
     lead: Lead | null;
@@ -11,7 +12,15 @@ interface LeadDetailPanelProps {
 }
 
 export const LeadDetailPanel = ({ lead, onClose, onAgentStart, variant = 'modal' }: LeadDetailPanelProps) => {
+    const { deleteLead } = useLeads();
+
     if (!lead) return null;
+
+    const handleDelete = async () => {
+        if (!lead || !window.confirm("Bu lead'i silmek istediğinize emin misiniz?")) return;
+        await deleteLead(lead.id);
+        onClose();
+    };
 
     const handleWhatsApp = () => {
         const phone = lead.phone.replace(/[^\d]/g, '');
@@ -141,6 +150,17 @@ export const LeadDetailPanel = ({ lead, onClose, onAgentStart, variant = 'modal'
                                 Web Sitesi
                             </Button>
                         )}
+                    </div>
+
+                    <div className="mt-4 flex justify-center">
+                        <Button
+                            variant="ghost"
+                            className="text-red-500 hover:text-red-600 hover:bg-red-50/50 h-10 px-4 text-xs font-semibold rounded-xl"
+                            onClick={handleDelete}
+                        >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Sistemden Sil
+                        </Button>
                     </div>
                 </div>
             </div>

@@ -15,18 +15,28 @@ export const n8nEvolutionService = {
      * This calls the N8N webhook which in turn calls Evolution API's /instance/create or /instance/connect
      * @param instanceName The name of the instance to connect (default: testwp)
      */
-    async startSession(instanceName: string = "testwp"): Promise<{ success: boolean; message: string }> {
-        console.log("[N8N Service] Triggering session start for:", instanceName);
+    async startSession(instanceName?: string): Promise<{ success: boolean; message: string }> {
+        const tenant = localStorage.getItem('tenant') || 'furkan';
+
+        let targetInstance = instanceName;
+        if (!targetInstance || targetInstance === "testwp") {
+            targetInstance = tenant === 'gokhan' ? (import.meta.env.VITE_EVOLUTION_INSTANCE_NAME || "gokhan") : (import.meta.env.VITE_EVOLUTION_INSTANCE_NAME || "testwp");
+        }
+
+        console.log("[N8N Service] Triggering session start for:", targetInstance);
 
         try {
-            const response = await fetch(getN8nUrl("whatsapp-start"), {
+            const webhookUrl = tenant === 'gokhan' ? "gokhan-ana-webhook" : "whatsapp-start";
+            const action = tenant === 'gokhan' ? "connect" : "start_session";
+
+            const response = await fetch(getN8nUrl(webhookUrl), {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
-                    instanceName: instanceName,
-                    action: "start_session"
+                    instanceName: targetInstance,
+                    action: action
                 }),
             });
 
@@ -50,24 +60,21 @@ export const n8nEvolutionService = {
     /**
      * Generates an AI offer message for a specific lead.
      */
-    async generateMessage(companyName: string, offerType: string = "yapay zeka çözümleri"): Promise<string> {
+    async generateMessage(companyName: string, companyCategory: string = ""): Promise<string> {
         try {
-            // Using the production URL directly via proxy (assuming proxy is set to handle /api/n8n -> https://n8n.lueratech.com)
-            // Or if we want to bypass proxy issues and use the full URL if CORS allows (it usually does for server-to-server or if configured)
-            // But since we set up a proxy for /api/n8n, let's stick to the proxy pattern for consistency, 
-            // BUT we need to make sure the proxy points to the right place. 
-            // The user gave: https://n8n.lueratech.com/webhook/whatsapp-ai-preview
-            // So we should update the fetch call to use the proxy path.
+            const tenant = localStorage.getItem('tenant') || 'furkan';
+            const aiWebhookId = tenant === 'gokhan'
+                ? (import.meta.env.VITE_N8N_AI_WEBHOOK_GOKHAN || "whatsapp-ai-preview-gokhan")
+                : (import.meta.env.VITE_N8N_AI_WEBHOOK || "whatsapp-ai-preview");
 
-            // Use helper to ensure correct URL in both Dev and Prod
-            const response = await fetch(getN8nUrl("whatsapp-ai-preview"), {
+            const response = await fetch(getN8nUrl(aiWebhookId), {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"
                 },
                 body: JSON.stringify({
                     companyName,
-                    offerType
+                    companyCategory
                 })
             });
 
@@ -79,8 +86,7 @@ export const n8nEvolutionService = {
             return data.message || "Mesaj oluşturulamadı.";
         } catch (error) {
             console.error("AI Generation Error:", error);
-            // Fallback for demo if N8N is not running
-            return `Merhaba ${companyName}! 🚀 LUERA olarak size özel ${offerType} sunmak istiyoruz.`;
+            return `Merhaba ${companyName}! Sizinle görüşmek isteriz.`;
         }
     },
 
@@ -92,7 +98,6 @@ export const n8nEvolutionService = {
         try {
             console.log("[N8N Service] Sending bulk request for", leads.length, "leads");
 
-            // Format leads for N8N
             const formattedLeads = leads.map(l => ({
                 phone: l.lead.phone,
                 message: l.message,
@@ -100,15 +105,10 @@ export const n8nEvolutionService = {
                 companyCategory: l.lead.company
             }));
 
-            // Use the proxy path for the bulk webhook
-            // Ideally this should be configured in vite.config.ts if it's a new path, 
-            // but assuming /api/n8n proxies to the N8N instance, we just append the webhook path.
-            // If the proxy is just for the base URL, we might need the full path.
-            // Based on previous file, N8N_TRIGGER_URL was /api/n8n/webhook/whatsapp-start
-            // So we use /api/n8n/webhook/whatsapp-send-bulk
+            const tenant = localStorage.getItem('tenant') || 'furkan';
+            const bulkWebhookId = tenant === 'gokhan' ? "whatsapp-bulk-gokhan" : "whatsapp-bulk-v19";
 
-            // V19 Workflow with Completion Notification
-            const response = await fetch(getN8nUrl("whatsapp-bulk-v19"), {
+            const response = await fetch(getN8nUrl(bulkWebhookId), {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"
@@ -131,7 +131,6 @@ export const n8nEvolutionService = {
             };
         } catch (error) {
             console.error("Bulk Send Error:", error);
-            // Simulate success for demo if N8N is not reachable
             return {
                 success: true,
                 message: "Dev Modu: Toplu gönderim simüle edildi (N8N bağlantısı yok)",

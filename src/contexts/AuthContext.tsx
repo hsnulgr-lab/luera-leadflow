@@ -58,8 +58,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             });
 
             if (error) {
+                // Denenen veritabanında başarısız olduysa, diğer veritabanını dene
+                const currentTenant = localStorage.getItem('tenant') || 'furkan';
+                const otherTenant = currentTenant === 'furkan' ? 'gokhan' : 'furkan';
+
+                const otherUrl = otherTenant === 'gokhan' ? import.meta.env.VITE_GOKHAN_SUPABASE_URL : import.meta.env.VITE_SUPABASE_URL;
+                const otherKey = otherTenant === 'gokhan' ? import.meta.env.VITE_GOKHAN_SUPABASE_ANON_KEY : import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+                if (otherUrl && otherKey) {
+                    const { createClient } = await import('@supabase/supabase-js');
+                    const tempClient = createClient(otherUrl, otherKey);
+
+                    const { data: otherData, error: otherError } = await tempClient.auth.signInWithPassword({
+                        email,
+                        password
+                    });
+
+                    // Diğer veritabanında başarılı olduysa, sistemi o kullanıcıya geçir ve yenile
+                    if (!otherError && otherData.user) {
+                        localStorage.setItem('tenant', otherTenant);
+                        window.location.reload();
+                        return { success: true };
+                    }
+                }
+
                 console.error("Supabase Login Error:", error);
-                return { success: false, error: error.message };
+                return { success: false, error: 'Kullanıcı adı veya şifre hatalı' };
             }
 
             setUser(mapSupabaseUser(data.user));
