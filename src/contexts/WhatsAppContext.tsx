@@ -13,7 +13,7 @@ interface WhatsAppContextType {
     setIsSending: React.Dispatch<React.SetStateAction<boolean>>;
     setBulkSendStatus: React.Dispatch<React.SetStateAction<"idle" | "sending" | "completed">>;
     handleSendQueue: () => Promise<void>;
-    handleAddToQueue: (leadsToAdd: Lead[], offerType: string) => void;
+    handleAddToQueue: (leadsToAdd: Lead[]) => void;
 }
 
 const WhatsAppContext = createContext<WhatsAppContextType | null>(null);
@@ -112,7 +112,7 @@ export const WhatsAppProvider = ({ children }: { children: ReactNode }) => {
         }
     };
 
-    const handleAddToQueue = (newLeads: Lead[], offerType: string) => {
+    const handleAddToQueue = (newLeads: Lead[]) => {
         if (newLeads.length === 0) return;
 
         const newQueue = newLeads.map(lead => ({
@@ -125,7 +125,7 @@ export const WhatsAppProvider = ({ children }: { children: ReactNode }) => {
         setMessageQueue(prev => [...prev, ...newQueue]);
 
         for (const item of newQueue) {
-            n8nEvolutionService.generateMessage(item.lead.name, offerType)
+            n8nEvolutionService.generateMessage(item.lead.name, item.lead.company || '')
                 .then(message => {
                     setMessageQueue(prev => prev.map(q =>
                         q.id === item.id ? { ...q, message, status: "pending" as const } : q
@@ -134,7 +134,7 @@ export const WhatsAppProvider = ({ children }: { children: ReactNode }) => {
                 .catch(() => {
                     setMessageQueue(prev => prev.map(q =>
                         q.id === item.id
-                            ? { ...q, message: `Merhaba ${item.lead.name}! 🚀 ${offerType} hakkında görüşmek isteriz.`, status: "pending" as const }
+                            ? { ...q, message: `Merhaba ${item.lead.name}! 🚀 Sizinle görüşmek isteriz.`, status: "pending" as const }
                             : q
                     ));
                 });

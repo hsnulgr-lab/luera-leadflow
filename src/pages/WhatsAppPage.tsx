@@ -109,7 +109,6 @@ const WhatsAppPage = () => {
 
 
     const { leads: realLeads } = useLeads();
-    const offerType = "yapay zeka çözümleri ile işletmenizi büyütme";
 
     // Action: Start Connection Process
     const handleConnect = async () => {
@@ -152,7 +151,7 @@ const WhatsAppPage = () => {
         setPreviewMessage("Yapay zeka şirketi analiz edip özel teklif mesajı hazırlıyor... 🤖");
 
         try {
-            const message = await n8nEvolutionService.generateMessage(lead.name, offerType);
+            const message = await n8nEvolutionService.generateMessage(lead.name, lead.company || '');
             setPreviewMessage(message);
         } catch (error) {
             console.error("AI Error:", error);
@@ -195,7 +194,7 @@ const WhatsAppPage = () => {
             return;
         }
 
-        handleAddToQueueContext(newLeads, offerType);
+        handleAddToQueueContext(newLeads);
         setSelectedLeads([]);
         setPreviewLead(null);
         setPreviewMessage("");
@@ -248,13 +247,13 @@ const WhatsAppPage = () => {
         ));
 
         try {
-            const message = await n8nEvolutionService.generateMessage(item.lead.name, offerType);
+            const message = await n8nEvolutionService.generateMessage(item.lead.name, item.lead.company || '');
             setMessageQueue(prev => prev.map(q =>
                 q.id === id ? { ...q, message, status: "pending" as const } : q
             ));
             setEditedMessage(message);
         } catch {
-            const fallback = `Merhaba ${item.lead.name}! 🚀 ${offerType} hakkında görüşmek isteriz.`;
+            const fallback = `Merhaba ${item.lead.name}! 🚀 Sizinle görüşmek isteriz.`;
             setMessageQueue(prev => prev.map(q =>
                 q.id === id ? { ...q, message: fallback, status: "pending" as const } : q
             ));
