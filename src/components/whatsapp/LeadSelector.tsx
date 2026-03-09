@@ -67,11 +67,12 @@ export const LeadSelector = ({
                     return (
                         <button
                             key={lead.id}
-                            onClick={() => onSelectLead(lead.id)}
+                            onClick={() => !isSent && onSelectLead(lead.id)}
+                            disabled={isSent}
                             className={cn(
                                 "w-full text-left flex items-center gap-3 p-3 rounded-xl transition-all border group",
                                 isSent
-                                    ? "bg-green-50/40 border-green-100/50 opacity-70"
+                                    ? "bg-slate-50/80 border-slate-100 opacity-60 cursor-not-allowed"
                                     : isSelected
                                         ? "bg-[#CCFF00]/10 border-[#CCFF00] shadow-sm"
                                         : "bg-white border-transparent hover:bg-slate-50 hover:border-slate-100"
@@ -79,24 +80,24 @@ export const LeadSelector = ({
                         >
                             <div className={cn(
                                 "w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all shrink-0",
-                                isSent ? "bg-green-100 text-green-600"
+                                isSent ? "bg-emerald-50 text-emerald-400 ring-1 ring-emerald-100"
                                     : isSelected ? "bg-[#CCFF00] text-slate-900" : "bg-slate-100 text-slate-500 group-hover:bg-slate-200"
                             )}>
-                                {isSent ? "✓" : lead.name.substring(0, 2).toUpperCase()}
+                                {isSent ? <CheckCircle2 className="w-5 h-5" /> : lead.name.substring(0, 2).toUpperCase()}
                             </div>
                             <div className="flex-1 min-w-0">
                                 <div className="flex justify-between items-start gap-2">
                                     <h3 className={cn(
                                         "font-semibold text-sm leading-snug line-clamp-2 break-words",
-                                        isSent ? "text-slate-500" : "text-slate-900"
+                                        isSent ? "text-slate-400" : "text-slate-900"
                                     )}>{lead.name}</h3>
                                     {isSent ? (
-                                        <span className="text-[9px] font-bold text-green-600 bg-green-100 px-1.5 py-0.5 rounded-full shrink-0">Gönderildi</span>
+                                        <span className="text-[9px] font-semibold text-emerald-500 bg-emerald-50 px-1.5 py-0.5 rounded-full shrink-0 whitespace-nowrap ring-1 ring-emerald-100">Gönderildi ✓</span>
                                     ) : isSelected ? (
                                         <CheckCircle2 className="w-4 h-4 text-[#CCFF00] fill-slate-900 shrink-0 mt-0.5" />
                                     ) : null}
                                 </div>
-                                <p className="text-xs text-slate-500 truncate mt-0.5">{lead.company}</p>
+                                <p className={cn("text-xs truncate mt-0.5", isSent ? "text-slate-300" : "text-slate-500")}>{lead.company}</p>
                             </div>
                         </button>
                     );

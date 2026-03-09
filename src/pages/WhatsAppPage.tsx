@@ -18,7 +18,6 @@ import { Button } from "@/components/ui/button";
 import { n8nEvolutionService } from "@/services/n8nEvolutionService";
 import { useLeads } from "@/hooks/useLeads";
 import { useQRCode } from "@/hooks/useQRCode";
-import { useSentHistory } from "@/hooks/useSentHistory";
 import { useWhatsApp } from "@/contexts/WhatsAppContext";
 import { cn } from "@/utils/cn";
 import { Badge } from "@/components/ui/badge";
@@ -42,7 +41,11 @@ const WhatsAppPage = () => {
         isSending,
         bulkSendStatus,
         handleSendQueue: handleSendQueueContext,
-        handleAddToQueue: handleAddToQueueContext
+        handleAddToQueue: handleAddToQueueContext,
+        sentLeadIds,
+        sentRecords,
+        wasSent,
+        getSentFromList,
     } = useWhatsApp();
     const [previewMessage, setPreviewMessage] = useState<string>("");
     const [previewLead, setPreviewLead] = useState<Lead | null>(null);
@@ -57,8 +60,7 @@ const WhatsAppPage = () => {
 
     const tenant = localStorage.getItem('tenant') || 'furkan';
     const INSTANCE_NAME = tenant === 'gokhan' ? 'gokhan' : 'testwp';
-    const { qrCode, clearQRCode } = useQRCode(INSTANCE_NAME);
-    const { sentLeadIds, sentRecords, markAsSent, wasSent, getSentFromList } = useSentHistory();
+    const { qrCode, clearQRCode, requestNewQR } = useQRCode(INSTANCE_NAME);
 
     // Bugün gönderilen sayısı ve başarı oranı hesapla
     const today = new Date().toISOString().split('T')[0];
@@ -92,13 +94,10 @@ const WhatsAppPage = () => {
         };
     }, [qrCode, connectionStatus, clearQRCode]);
 
-    // Load state from local storage on mount
+    // Load selected leads from local storage on mount
     useEffect(() => {
         const storedLeads = localStorage.getItem("whatsapp_selected_leads");
-        const storedQueue = localStorage.getItem("whatsapp_message_queue");
-
         if (storedLeads) setSelectedLeads(JSON.parse(storedLeads));
-        if (storedQueue) setMessageQueue(JSON.parse(storedQueue));
     }, []);
 
     // Save state to local storage on changes
@@ -119,7 +118,7 @@ const WhatsAppPage = () => {
         }
 
         setConnectionStatus("connecting");
-        clearQRCode();
+        requestNewQR(); // Clear old QR and accept any new one from Supabase
 
         try {
             await n8nEvolutionService.startSession(INSTANCE_NAME);
@@ -132,6 +131,9 @@ const WhatsAppPage = () => {
     const handleSelectLead = async (leadId: string) => {
         const lead = realLeads.find(l => l.id === leadId);
         if (!lead) return;
+
+        // Gönderilmiş lead'leri seçmeye izin verme
+        if (wasSent(leadId)) return;
 
         if (selectedLeads.find(l => l.id === leadId)) {
             setSelectedLeads(selectedLeads.filter(l => l.id !== leadId));
@@ -266,15 +268,15 @@ const WhatsAppPage = () => {
         lead.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
-    // Toplu seçim: tüm filtrelenmiş lead'leri seç/kaldır
+    // Toplu seçim: sadece gönderilmemiş lead'leri seç/kaldır
     const handleSelectAll = () => {
-        if (selectedLeads.length === filteredLeads.length) {
+        const unsent = filteredLeads.filter(l => !wasSent(l.id));
+        if (selectedLeads.length === unsent.length && unsent.length > 0) {
             setSelectedLeads([]);
             setPreviewLead(null);
             setPreviewMessage("");
         } else {
-            setSelectedLeads([...filteredLeads]);
-
+            setSelectedLeads([...unsent]);
         }
     };
 

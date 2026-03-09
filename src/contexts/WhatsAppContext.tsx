@@ -1,14 +1,24 @@
-import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, ReactNode, useCallback } from 'react';
 import { Lead, MessageQueueItem } from '@/types/whatsapp';
 import { n8nEvolutionService } from '@/services/n8nEvolutionService';
 import { supabase } from '@/lib/supabase';
 import { useSentHistory } from '@/hooks/useSentHistory';
+
+interface SentRecord {
+    leadId: string;
+    leadName: string;
+    sentAt: string;
+}
 
 interface WhatsAppContextType {
     messageQueue: MessageQueueItem[];
     isSending: boolean;
     bulkSendStatus: "idle" | "sending" | "completed";
     lastCompletionTime: Date | null;
+    sentLeadIds: Set<string>;
+    sentRecords: SentRecord[];
+    wasSent: (leadId: string) => boolean;
+    getSentFromList: (leads: { id: string; name: string }[]) => { id: string; name: string }[];
     setMessageQueue: React.Dispatch<React.SetStateAction<MessageQueueItem[]>>;
     setIsSending: React.Dispatch<React.SetStateAction<boolean>>;
     setBulkSendStatus: React.Dispatch<React.SetStateAction<"idle" | "sending" | "completed">>;
@@ -23,7 +33,8 @@ export const WhatsAppProvider = ({ children }: { children: ReactNode }) => {
     const [isSending, setIsSending] = useState(false);
     const [bulkSendStatus, setBulkSendStatus] = useState<"idle" | "sending" | "completed">("idle");
     const [lastCompletionTime, setLastCompletionTime] = useState<Date | null>(null);
-    const { markAsSent } = useSentHistory();
+    const { markAsSent, sentLeadIds, sentRecords, wasSent, getSentFromList } = useSentHistory();
+    const isInitialLoad = useRef(true);
 
     // Initial Load from LocalStorage
     useEffect(() => {
@@ -33,8 +44,12 @@ export const WhatsAppProvider = ({ children }: { children: ReactNode }) => {
         }
     }, []);
 
-    // Save to LocalStorage on Change
+    // Save to LocalStorage on Change — skip first render to avoid writing []
     useEffect(() => {
+        if (isInitialLoad.current) {
+            isInitialLoad.current = false;
+            return;
+        }
         localStorage.setItem("whatsapp_message_queue", JSON.stringify(messageQueue));
     }, [messageQueue]);
 
@@ -147,6 +162,10 @@ export const WhatsAppProvider = ({ children }: { children: ReactNode }) => {
             isSending,
             bulkSendStatus,
             lastCompletionTime,
+            sentLeadIds,
+            sentRecords,
+            wasSent,
+            getSentFromList,
             setMessageQueue,
             setIsSending,
             setBulkSendStatus,

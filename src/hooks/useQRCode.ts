@@ -13,6 +13,8 @@ export function useQRCode(instanceName: string = "gokhan") {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+    // Timestamp of when user clicked "QR Kod Oluştur" — only accept QRs updated AFTER this
+    const [requestedAt, setRequestedAt] = useState<number | null>(null);
 
     // Fetch QR code from Supabase
     const fetchQRCode = useCallback(async () => {
@@ -29,7 +31,6 @@ export function useQRCode(instanceName: string = "gokhan") {
                 .single();
 
             if (fetchError) {
-                // No QR code found is not an error
                 if (fetchError.code === "PGRST116") {
                     console.log("[useQRCode] No QR code found for", instanceName);
                     setQrCode(null);
@@ -40,22 +41,31 @@ export function useQRCode(instanceName: string = "gokhan") {
 
             if (data) {
                 const qrData = data as QRCodeData;
-
-                // Check if this is a relatively fresh QR code (updated in last 75 seconds)
-                // We use 75 seconds to strictly enforce the QR code validity window
                 const updatedAt = new Date(qrData.updated_at);
-                const timeDiff = Date.now() - updatedAt.getTime();
-                const seventyFiveSeconds = 75 * 1000;
 
-                if (timeDiff < seventyFiveSeconds) {
-                    console.log("[useQRCode] Fresh QR code found!", qrData.updated_at);
-                    setQrCode(qrData.qr_base64);
-                    setLastUpdated(updatedAt);
-                    return qrData.qr_base64;
+                if (requestedAt) {
+                    // User is actively waiting for a NEW QR — only accept if updated AFTER click
+                    if (updatedAt.getTime() > requestedAt) {
+                        console.log("[useQRCode] New QR received after request!", qrData.updated_at);
+                        setQrCode(qrData.qr_base64);
+                        setLastUpdated(updatedAt);
+                        return qrData.qr_base64;
+                    } else {
+                        console.log("[useQRCode] Waiting for new QR... (current is from before request)");
+                        return null;
+                    }
                 } else {
-                    console.log("[useQRCode] QR code is stale (older than 75 secs), ignoring");
-                    setQrCode(null);
-                    return null;
+                    // No active request — normal freshness check (75 seconds)
+                    const timeDiff = Date.now() - updatedAt.getTime();
+                    if (timeDiff < 75000) {
+                        console.log("[useQRCode] Fresh QR code found!", qrData.updated_at);
+                        setQrCode(qrData.qr_base64);
+                        setLastUpdated(updatedAt);
+                        return qrData.qr_base64;
+                    } else {
+                        setQrCode(null);
+                        return null;
+                    }
                 }
             }
 
@@ -67,7 +77,7 @@ export function useQRCode(instanceName: string = "gokhan") {
         } finally {
             setLoading(false);
         }
-    }, [instanceName]);
+    }, [instanceName, requestedAt]);
 
     // Subscribe to realtime updates AND Poll for backup
     useEffect(() => {
@@ -87,8 +97,14 @@ export function useQRCode(instanceName: string = "gokhan") {
                 (payload) => {
                     console.log("[useQRCode] Realtime update received:", payload);
                     if (payload.new && "qr_base64" in payload.new) {
+                        const newUpdatedAt = new Date(payload.new.updated_at as string);
+                        // If user is waiting, only accept if updated after request
+                        if (requestedAt && newUpdatedAt.getTime() <= requestedAt) {
+                            console.log("[useQRCode] Realtime: ignoring, QR is from before request");
+                            return;
+                        }
                         setQrCode(payload.new.qr_base64 as string);
-                        setLastUpdated(new Date());
+                        setLastUpdated(newUpdatedAt);
                     }
                 }
             )
@@ -98,7 +114,6 @@ export function useQRCode(instanceName: string = "gokhan") {
         fetchQRCode();
 
         // 3. Polling fallback (Every 3 seconds)
-        // This ensures that even if Realtime fails (firewall, config), we still get the QR
         const intervalId = setInterval(() => {
             console.log("[useQRCode] Polling for QR code...");
             fetchQRCode();
@@ -111,10 +126,18 @@ export function useQRCode(instanceName: string = "gokhan") {
         };
     }, [instanceName, fetchQRCode]);
 
-    // Clear QR code
+    // Request new QR — sets timestamp, only QRs after this time will be accepted
+    const requestNewQR = useCallback(() => {
+        setQrCode(null);
+        setLastUpdated(null);
+        setRequestedAt(Date.now());
+    }, []);
+
+    // Clear QR code and reset request
     const clearQRCode = useCallback(() => {
         setQrCode(null);
         setLastUpdated(null);
+        setRequestedAt(null);
     }, []);
 
     return {
@@ -124,5 +147,6 @@ export function useQRCode(instanceName: string = "gokhan") {
         lastUpdated,
         fetchQRCode,
         clearQRCode,
+        requestNewQR,
     };
 }

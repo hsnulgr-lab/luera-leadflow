@@ -23,18 +23,19 @@ export const useSentHistory = () => {
     useEffect(() => {
         const loadHistory = async () => {
             // 1. Instant load from localStorage
+            let localRecords: SentRecord[] = [];
             try {
                 const stored = localStorage.getItem(STORAGE_KEY);
                 if (stored) {
-                    const records: SentRecord[] = JSON.parse(stored);
-                    setSentRecords(records);
-                    setSentLeadIds(new Set(records.map(r => r.leadId)));
+                    localRecords = JSON.parse(stored);
+                    setSentRecords(localRecords);
+                    setSentLeadIds(new Set(localRecords.map(r => r.leadId)));
                 }
             } catch (e) {
                 console.error('localStorage read error:', e);
             }
 
-            // 2. Sync with Supabase (source of truth)
+            // 2. Sync with Supabase — MERGE, never overwrite
             try {
                 const { data, error } = await supabase
                     .from('whatsapp_sent_log')
@@ -42,16 +43,29 @@ export const useSentHistory = () => {
                     .order('sent_at', { ascending: false });
 
                 if (!error && data) {
-                    const records: SentRecord[] = data.map(row => ({
+                    const supabaseRecords: SentRecord[] = data.map(row => ({
                         leadId: row.lead_id,
                         leadName: row.lead_name,
                         sentAt: row.sent_at,
                     }));
-                    setSentRecords(records);
-                    setSentLeadIds(new Set(records.map(r => r.leadId)));
-                    // Update localStorage with server data
-                    localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+
+                    // Merge: combine localStorage + Supabase, deduplicate by leadId
+                    const mergedMap = new Map<string, SentRecord>();
+                    // localStorage first (local records are fallback)
+                    for (const r of localRecords) {
+                        mergedMap.set(r.leadId, r);
+                    }
+                    // Supabase overwrites duplicates (server is more authoritative)
+                    for (const r of supabaseRecords) {
+                        mergedMap.set(r.leadId, r);
+                    }
+                    const merged = Array.from(mergedMap.values());
+
+                    setSentRecords(merged);
+                    setSentLeadIds(new Set(merged.map(r => r.leadId)));
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
                 }
+                // If Supabase returns empty but localStorage has data → keep localStorage (no overwrite)
             } catch (e) {
                 console.error('Supabase sync error:', e);
                 // localStorage fallback already loaded
