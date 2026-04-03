@@ -3,6 +3,7 @@ import { Lead, MessageQueueItem } from '@/types/whatsapp';
 import { n8nEvolutionService } from '@/services/n8nEvolutionService';
 import { supabase } from '@/lib/supabase';
 import { useSentHistory } from '@/hooks/useSentHistory';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface SentRecord {
     leadId: string;
@@ -29,16 +30,20 @@ interface WhatsAppContextType {
 const WhatsAppContext = createContext<WhatsAppContextType | null>(null);
 
 export const WhatsAppProvider = ({ children }: { children: ReactNode }) => {
+    const { user } = useAuth();
     const [messageQueue, setMessageQueue] = useState<MessageQueueItem[]>([]);
     const [isSending, setIsSending] = useState(false);
     const [bulkSendStatus, setBulkSendStatus] = useState<"idle" | "sending" | "completed">("idle");
     const [lastCompletionTime, setLastCompletionTime] = useState<Date | null>(null);
-    const { markAsSent, sentLeadIds, sentRecords, wasSent, getSentFromList } = useSentHistory();
+    const { markAsSent, sentLeadIds, sentRecords, wasSent, getSentFromList } = useSentHistory(user?.id);
     const isInitialLoad = useRef(true);
+
+    // Kullanıcıya özel localStorage key
+    const queueStorageKey = user ? `whatsapp_message_queue_${user.id}` : 'whatsapp_message_queue';
 
     // Initial Load from LocalStorage
     useEffect(() => {
-        const storedQueue = localStorage.getItem("whatsapp_message_queue");
+        const storedQueue = localStorage.getItem(queueStorageKey);
         if (storedQueue) {
             setMessageQueue(JSON.parse(storedQueue));
         }
@@ -50,7 +55,7 @@ export const WhatsAppProvider = ({ children }: { children: ReactNode }) => {
             isInitialLoad.current = false;
             return;
         }
-        localStorage.setItem("whatsapp_message_queue", JSON.stringify(messageQueue));
+        localStorage.setItem(queueStorageKey, JSON.stringify(messageQueue));
     }, [messageQueue]);
 
     // Listen for bulk send completion notifications from Supabase

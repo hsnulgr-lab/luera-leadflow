@@ -74,6 +74,7 @@ export const LeadProvider = ({ children }: { children: ReactNode }) => {
             const { data, error } = await supabase
                 .from('leads')
                 .select('*')
+                .eq('user_id', user.id)
                 .order('created_at', { ascending: false });
 
             if (error) {
@@ -118,6 +119,7 @@ export const LeadProvider = ({ children }: { children: ReactNode }) => {
                 website: lead.website || null,
                 status: 'new',
                 score: lead.score || null,
+                user_id: user.id,
             }));
 
             const { data, error } = await supabase

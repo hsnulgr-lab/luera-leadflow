@@ -2,17 +2,20 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { User, Bell, Globe, Key, Webhook, Save, CheckCircle2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/lib/supabase";
 
 export const SettingsPage = () => {
     const { user } = useAuth();
     const [activeTab, setActiveTab] = useState("profile");
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState(false);
+    const [settingsLoaded, setSettingsLoaded] = useState(false);
 
     // Integrations State
     const [n8nSearchUrl, setN8nSearchUrl] = useState("");
     const [n8nAgentUrl, setN8nAgentUrl] = useState("");
     const [geminiKey, setGeminiKey] = useState("");
+    const [evolutionInstance, setEvolutionInstance] = useState("");
 
     // General State
     const [profileName, setProfileName] = useState(user?.name || "");
@@ -28,51 +31,65 @@ export const SettingsPage = () => {
         agentAction: true
     });
 
-    // Load settings from localStorage
+    // Kullanıcıya özel ayarları Supabase'den yükle
     useEffect(() => {
-        // Migration: Check for old key if new ones allow
-        const oldUrl = localStorage.getItem("n8n_webhook_url") || import.meta.env.VITE_N8N_WEBHOOK_URL || "";
+        if (!user) return;
 
-        const storedSearchUrl = localStorage.getItem("n8n_search_webhook_url") || oldUrl;
-        const storedAgentUrl = localStorage.getItem("n8n_agent_webhook_url") || "";
-        const storedGeminiKey = localStorage.getItem("gemini_api_key") || import.meta.env.VITE_GEMINI_API_KEY || "";
+        const loadSettings = async () => {
+            const { data, error } = await supabase
+                .from('user_settings')
+                .select('*')
+                .eq('user_id', user.id)
+                .single();
 
-        setN8nSearchUrl(storedSearchUrl);
-        setN8nAgentUrl(storedAgentUrl);
-        setGeminiKey(storedGeminiKey);
+            if (!error && data) {
+                setN8nSearchUrl(data.n8n_webhook_url || import.meta.env.VITE_N8N_WEBHOOK_URL || "");
+                setGeminiKey(data.gemini_api_key || import.meta.env.VITE_GEMINI_API_KEY || "");
+                setEvolutionInstance(data.evolution_instance_name || "");
+            } else {
+                // Supabase'de kayıt yoksa env değerlerini varsayılan olarak yükle
+                setN8nSearchUrl(import.meta.env.VITE_N8N_WEBHOOK_URL || "");
+                setGeminiKey(import.meta.env.VITE_GEMINI_API_KEY || "");
+            }
 
-        // Update local state if user context is available
-        if (user) {
             setProfileName(user.name || "");
             setEmail(user.email || "");
-        }
+            setSettingsLoaded(true);
+        };
+
+        loadSettings();
     }, [user]);
 
-    const handleSave = () => {
+    const handleSave = async () => {
+        if (!user) return;
+
         setLoading(true);
         setSuccess(false);
 
-        // Simulate save delay
-        setTimeout(() => {
-            // Save to LocalStorage
-            localStorage.setItem("n8n_search_webhook_url", n8nSearchUrl);
-            localStorage.setItem("n8n_agent_webhook_url", n8nAgentUrl);
-            localStorage.setItem("gemini_api_key", geminiKey);
+        try {
+            const { error } = await supabase
+                .from('user_settings')
+                .upsert({
+                    user_id: user.id,
+                    n8n_webhook_url: n8nSearchUrl || null,
+                    gemini_api_key: geminiKey || null,
+                    evolution_instance_name: evolutionInstance || null,
+                    updated_at: new Date().toISOString(),
+                }, { onConflict: 'user_id' });
 
-            // In a real app, we would also save profile/notification preferences to a backend
-
-            setLoading(false);
-            setSuccess(true);
-
-            // Reload page to apply changes to services (since they read on init)
-            // Or we could trigger a service reload event
-            // asking user to refresh is safer for now
-            if (confirm("Ayarlar kaydedildi. Değişikliklerin etkili olması için sayfa yenilensin mi?")) {
-                window.location.reload();
-            } else {
-                setTimeout(() => setSuccess(false), 3000);
+            if (error) {
+                console.error('Ayarlar kaydedilemedi:', error);
+                alert('Ayarlar kaydedilirken bir hata oluştu.');
+                return;
             }
-        }, 800);
+
+            setSuccess(true);
+            setTimeout(() => setSuccess(false), 3000);
+        } catch (err) {
+            console.error('Beklenmeyen hata:', err);
+        } finally {
+            setLoading(false);
+        }
     };
 
     const tabs = [
@@ -132,9 +149,10 @@ export const SettingsPage = () => {
                                             <input
                                                 type="email"
                                                 value={email}
-                                                onChange={(e) => setEmail(e.target.value)}
-                                                className="w-full px-3 py-2 rounded-md border border-border bg-background/50 focus:ring-2 focus:ring-gray-200 outline-none"
+                                                disabled
+                                                className="w-full px-3 py-2 rounded-md border border-border bg-background/50 opacity-60 cursor-not-allowed"
                                             />
+                                            <p className="text-xs text-muted-foreground mt-1">E-posta değiştirilemez.</p>
                                         </div>
                                     </div>
                                 </div>
@@ -164,6 +182,10 @@ export const SettingsPage = () => {
                         {/* INTEGRATIONS TAB */}
                         {activeTab === "integrations" && (
                             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                {!settingsLoaded && (
+                                    <p className="text-sm text-muted-foreground">Ayarlar yükleniyor...</p>
+                                )}
+
                                 <div>
                                     <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                                         <Webhook className="w-5 h-5 text-[#CCFF00]" />
@@ -172,9 +194,9 @@ export const SettingsPage = () => {
 
                                     <div className="space-y-6 max-w-xl">
                                         <div>
-                                            <label className="text-sm font-medium mb-1.5 block">Lead Arama Webhook'u (Mark 1)</label>
+                                            <label className="text-sm font-medium mb-1.5 block">Lead Arama Webhook'u</label>
                                             <p className="text-xs text-muted-foreground mb-2">
-                                                Google Maps scraping ve lead bulma workflow'u (GET/POST trigger).
+                                                Google Maps scraping ve lead bulma workflow'u.
                                             </p>
                                             <input
                                                 type="text"
@@ -186,9 +208,9 @@ export const SettingsPage = () => {
                                         </div>
 
                                         <div>
-                                            <label className="text-sm font-medium mb-1.5 block">AI Ajan Webhook'u (Mark 2)</label>
+                                            <label className="text-sm font-medium mb-1.5 block">AI Ajan Webhook'u</label>
                                             <p className="text-xs text-muted-foreground mb-2">
-                                                Website analizi ve mesaj yazma workflow'u (POST trigger - start_agent_v1).
+                                                Website analizi ve mesaj yazma workflow'u.
                                             </p>
                                             <input
                                                 type="text"
@@ -208,10 +230,6 @@ export const SettingsPage = () => {
                                     </h2>
                                     <p className="text-sm text-muted-foreground mb-4">
                                         Mesaj ve teklif oluşturma için kullanılan AI modelinin API anahtarı.
-                                        <br />
-                                        <span className="text-xs text-blue-600 dark:text-blue-400">
-                                            Not: Bu anahtar tarayıcınızda yerel olarak güvenle saklanır. Her kullanıcı kendi anahtarını kullanabilir.
-                                        </span>
                                     </p>
                                     <div className="max-w-xl">
                                         <input
@@ -219,6 +237,25 @@ export const SettingsPage = () => {
                                             value={geminiKey}
                                             onChange={(e) => setGeminiKey(e.target.value)}
                                             placeholder="AIzaSy..."
+                                            className="w-full px-4 py-3 rounded-lg border border-border bg-secondary/30 font-mono text-sm focus:ring-2 focus:ring-gray-200 outline-none"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="pt-6 border-t border-border/50">
+                                    <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                                        <Globe className="w-5 h-5 text-[#CCFF00]" />
+                                        WhatsApp (Evolution API)
+                                    </h2>
+                                    <p className="text-sm text-muted-foreground mb-4">
+                                        Hesabınıza ait Evolution API instance adı. Kayıt sırasında otomatik oluşturulur.
+                                    </p>
+                                    <div className="max-w-xl">
+                                        <input
+                                            type="text"
+                                            value={evolutionInstance}
+                                            onChange={(e) => setEvolutionInstance(e.target.value)}
+                                            placeholder="user_abc123..."
                                             className="w-full px-4 py-3 rounded-lg border border-border bg-secondary/30 font-mono text-sm focus:ring-2 focus:ring-gray-200 outline-none"
                                         />
                                     </div>

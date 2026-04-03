@@ -30,18 +30,49 @@ const mapSupabaseUser = (supabaseUser: SupabaseUser | null): User | null => {
     };
 };
 
+// Yeni kullanıcı için Evolution API'de instance oluştur
+const createEvolutionInstance = async (userId: string) => {
+    const evolutionUrl = import.meta.env.VITE_EVOLUTION_API_URL;
+    const evolutionKey = import.meta.env.VITE_EVOLUTION_API_KEY;
+
+    if (!evolutionUrl || !evolutionKey) return null;
+
+    const instanceName = `user_${userId.replace(/-/g, '').substring(0, 16)}`;
+
+    try {
+        const response = await fetch(`${evolutionUrl}/instance/create`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'apikey': evolutionKey,
+            },
+            body: JSON.stringify({
+                instanceName,
+                token: instanceName,
+                qrcode: true,
+            }),
+        });
+
+        if (response.ok) {
+            return instanceName;
+        }
+    } catch (err) {
+        console.error('Evolution instance oluşturulamadı:', err);
+    }
+
+    return instanceName; // Hata olsa bile instance adını kaydet
+};
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        // Get initial session
         supabase.auth.getSession().then(({ data: { session } }) => {
             setUser(mapSupabaseUser(session?.user ?? null));
             setIsLoading(false);
         });
 
-        // Listen for auth changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
             setUser(mapSupabaseUser(session?.user ?? null));
             setIsLoading(false);
@@ -52,60 +83,43 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
         try {
-            const { data, error } = await supabase.auth.signInWithPassword({
-                email,
-                password,
-            });
+            const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
             if (error) {
-                // Denenen veritabanında başarısız olduysa, diğer veritabanını dene
-                const currentTenant = localStorage.getItem('tenant') || 'furkan';
-                const otherTenant = currentTenant === 'furkan' ? 'gokhan' : 'furkan';
-
-                const otherUrl = otherTenant === 'gokhan' ? import.meta.env.VITE_GOKHAN_SUPABASE_URL : import.meta.env.VITE_SUPABASE_URL;
-                const otherKey = otherTenant === 'gokhan' ? import.meta.env.VITE_GOKHAN_SUPABASE_ANON_KEY : import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-                if (otherUrl && otherKey) {
-                    const { createClient } = await import('@supabase/supabase-js');
-                    const tempClient = createClient(otherUrl, otherKey);
-
-                    const { data: otherData, error: otherError } = await tempClient.auth.signInWithPassword({
-                        email,
-                        password
-                    });
-
-                    // Diğer veritabanında başarılı olduysa, sistemi o kullanıcıya geçir ve yenile
-                    if (!otherError && otherData.user) {
-                        localStorage.setItem('tenant', otherTenant);
-                        window.location.reload();
-                        return { success: true };
-                    }
-                }
-
-                console.error("Supabase Login Error:", error);
+                console.error('Supabase Login Error:', error);
                 return { success: false, error: 'Kullanıcı adı veya şifre hatalı' };
             }
 
             setUser(mapSupabaseUser(data.user));
             return { success: true };
         } catch (err) {
-            console.error("Unexpected Login Error:", err);
+            console.error('Unexpected Login Error:', err);
             return { success: false, error: 'Giriş yapılırken bir hata oluştu' };
         }
     };
 
     const signup = async (email: string, password: string, name: string): Promise<{ success: boolean; error?: string }> => {
         try {
-            const { error } = await supabase.auth.signUp({
+            const { data, error } = await supabase.auth.signUp({
                 email,
                 password,
-                options: {
-                    data: { name },
-                },
+                options: { data: { name } },
             });
 
             if (error) {
                 return { success: false, error: error.message };
+            }
+
+            // Kullanıcı oluşturulduysa Evolution instance aç ve user_settings kaydet
+            if (data.user) {
+                const instanceName = await createEvolutionInstance(data.user.id);
+
+                await supabase.from('user_settings').upsert({
+                    user_id: data.user.id,
+                    n8n_webhook_url: import.meta.env.VITE_N8N_WEBHOOK_URL || null,
+                    gemini_api_key: null,
+                    evolution_instance_name: instanceName,
+                }, { onConflict: 'user_id' });
             }
 
             return { success: true };
@@ -120,16 +134,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
 
     return (
-        <AuthContext.Provider
-            value={{
-                user,
-                isAuthenticated: !!user,
-                isLoading,
-                login,
-                signup,
-                logout,
-            }}
-        >
+        <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, signup, logout }}>
             {children}
         </AuthContext.Provider>
     );

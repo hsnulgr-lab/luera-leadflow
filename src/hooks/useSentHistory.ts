@@ -7,25 +7,31 @@ interface SentRecord {
     sentAt: string;
 }
 
-const STORAGE_KEY = 'whatsapp_sent_history';
+// Her kullanıcıya özel localStorage key
+const getStorageKey = (userId: string) => `whatsapp_sent_history_${userId}`;
 
 /**
  * Dual-layer duplicate protection:
- * 1. localStorage for instant offline checks
- * 2. Supabase whatsapp_sent_log for permanent server-side record
+ * 1. localStorage (kullanıcıya özel key) for instant offline checks
+ * 2. Supabase whatsapp_sent_log (user_id ile izole, RLS) for permanent server-side record
  */
-export const useSentHistory = () => {
+export const useSentHistory = (userId?: string) => {
     const [sentLeadIds, setSentLeadIds] = useState<Set<string>>(new Set());
     const [sentRecords, setSentRecords] = useState<SentRecord[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
-    // Load from both localStorage and Supabase on mount
     useEffect(() => {
+        if (!userId) {
+            setIsLoading(false);
+            return;
+        }
+
+        const storageKey = getStorageKey(userId);
+
         const loadHistory = async () => {
-            // 1. Instant load from localStorage
             let localRecords: SentRecord[] = [];
             try {
-                const stored = localStorage.getItem(STORAGE_KEY);
+                const stored = localStorage.getItem(storageKey);
                 if (stored) {
                     localRecords = JSON.parse(stored);
                     setSentRecords(localRecords);
@@ -35,11 +41,11 @@ export const useSentHistory = () => {
                 console.error('localStorage read error:', e);
             }
 
-            // 2. Sync with Supabase — MERGE, never overwrite
             try {
                 const { data, error } = await supabase
                     .from('whatsapp_sent_log')
                     .select('lead_id, lead_name, sent_at')
+                    .eq('user_id', userId)
                     .order('sent_at', { ascending: false });
 
                 if (!error && data) {
@@ -49,36 +55,29 @@ export const useSentHistory = () => {
                         sentAt: row.sent_at,
                     }));
 
-                    // Merge: combine localStorage + Supabase, deduplicate by leadId
                     const mergedMap = new Map<string, SentRecord>();
-                    // localStorage first (local records are fallback)
-                    for (const r of localRecords) {
-                        mergedMap.set(r.leadId, r);
-                    }
-                    // Supabase overwrites duplicates (server is more authoritative)
-                    for (const r of supabaseRecords) {
-                        mergedMap.set(r.leadId, r);
-                    }
+                    for (const r of localRecords) mergedMap.set(r.leadId, r);
+                    for (const r of supabaseRecords) mergedMap.set(r.leadId, r);
                     const merged = Array.from(mergedMap.values());
 
                     setSentRecords(merged);
                     setSentLeadIds(new Set(merged.map(r => r.leadId)));
-                    localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+                    localStorage.setItem(storageKey, JSON.stringify(merged));
                 }
-                // If Supabase returns empty but localStorage has data → keep localStorage (no overwrite)
             } catch (e) {
                 console.error('Supabase sync error:', e);
-                // localStorage fallback already loaded
             }
 
             setIsLoading(false);
         };
 
         loadHistory();
-    }, []);
+    }, [userId]);
 
-    // Mark leads as sent
     const markAsSent = useCallback(async (leads: { id: string; name: string }[]) => {
+        if (!userId) return;
+
+        const storageKey = getStorageKey(userId);
         const now = new Date().toISOString();
         const newRecords: SentRecord[] = leads.map(lead => ({
             leadId: lead.id,
@@ -86,10 +85,9 @@ export const useSentHistory = () => {
             sentAt: now,
         }));
 
-        // 1. Update state immediately
         setSentRecords(prev => {
             const updated = [...newRecords, ...prev];
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+            localStorage.setItem(storageKey, JSON.stringify(updated));
             return updated;
         });
         setSentLeadIds(prev => {
@@ -98,44 +96,39 @@ export const useSentHistory = () => {
             return updated;
         });
 
-        // 2. Persist to Supabase
         try {
             const rows = leads.map(lead => ({
                 lead_id: lead.id,
                 lead_name: lead.name,
                 sent_at: now,
+                user_id: userId,
             }));
 
             const { error } = await supabase
                 .from('whatsapp_sent_log')
-                .upsert(rows, { onConflict: 'lead_id' });
+                .upsert(rows, { onConflict: 'user_id,lead_id' });
 
             if (error) {
                 console.error('Supabase write error:', error);
             }
         } catch (e) {
             console.error('Supabase insert error:', e);
-            // localStorage already saved as backup
         }
-    }, []);
+    }, [userId]);
 
-    // Check if a lead was already sent
     const wasSent = useCallback((leadId: string): boolean => {
         return sentLeadIds.has(leadId);
     }, [sentLeadIds]);
 
-    // Get sent date for a lead
     const getSentDate = useCallback((leadId: string): string | null => {
         const record = sentRecords.find(r => r.leadId === leadId);
         return record ? record.sentAt : null;
     }, [sentRecords]);
 
-    // Filter out already-sent leads
     const filterNewLeads = useCallback((leads: { id: string }[]): { id: string }[] => {
         return leads.filter(l => !sentLeadIds.has(l.id));
     }, [sentLeadIds]);
 
-    // Get list of sent leads from a set
     const getSentFromList = useCallback((leads: { id: string; name: string }[]): { id: string; name: string }[] => {
         return leads.filter(l => sentLeadIds.has(l.id));
     }, [sentLeadIds]);
