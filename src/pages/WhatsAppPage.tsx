@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { n8nEvolutionService } from "@/services/n8nEvolutionService";
 import { useLeads } from "@/hooks/useLeads";
 import { useQRCode } from "@/hooks/useQRCode";
+import { useUserSettings } from "@/hooks/useUserSettings";
 import { useWhatsApp } from "@/contexts/WhatsAppContext";
 import { cn } from "@/utils/cn";
 import { Badge } from "@/components/ui/badge";
@@ -46,6 +47,8 @@ const WhatsAppPage = () => {
         sentRecords,
         wasSent,
         getSentFromList,
+        isPhoneInCooldown,
+        getPhoneRemainingTime,
     } = useWhatsApp();
     const [previewMessage, setPreviewMessage] = useState<string>("");
     const [previewLead, setPreviewLead] = useState<Lead | null>(null);
@@ -58,8 +61,8 @@ const WhatsAppPage = () => {
     const [editingQueueMessage, setEditingQueueMessage] = useState(false);
     const [editedMessage, setEditedMessage] = useState("");
 
-    const tenant = localStorage.getItem('tenant') || 'furkan';
-    const INSTANCE_NAME = tenant === 'gokhan' ? 'gokhan' : 'testwp';
+    const { settings: userSettings } = useUserSettings();
+    const INSTANCE_NAME = userSettings.evolution_instance_name || import.meta.env.VITE_EVOLUTION_INSTANCE_NAME || 'testwp';
     const { qrCode, clearQRCode, requestNewQR } = useQRCode(INSTANCE_NAME);
 
     // Bugün gönderilen sayısı ve başarı oranı hesapla
@@ -132,8 +135,9 @@ const WhatsAppPage = () => {
         const lead = realLeads.find(l => l.id === leadId);
         if (!lead) return;
 
-        // Gönderilmiş lead'leri seçmeye izin verme
+        // Gönderilmiş veya cooldown'daki lead'leri seçmeye izin verme
         if (wasSent(leadId)) return;
+        if (isPhoneInCooldown(lead.phone)) return;
 
         if (selectedLeads.find(l => l.id === leadId)) {
             setSelectedLeads(selectedLeads.filter(l => l.id !== leadId));
@@ -173,18 +177,23 @@ const WhatsAppPage = () => {
         const existingIds = new Set(messageQueue.map(m => m.lead.id));
         const inQueue = selectedLeads.filter(l => existingIds.has(l.id));
         const alreadySent = selectedLeads.filter(l => !existingIds.has(l.id) && wasSent(l.id));
-        const duplicates = [...inQueue, ...alreadySent];
-        const newLeads = selectedLeads.filter(l => !existingIds.has(l.id) && !wasSent(l.id));
+        const inCooldown = selectedLeads.filter(l => !existingIds.has(l.id) && !wasSent(l.id) && isPhoneInCooldown(l.phone));
+        const duplicates = [...inQueue, ...alreadySent, ...inCooldown];
+        const newLeads = selectedLeads.filter(l => !existingIds.has(l.id) && !wasSent(l.id) && !isPhoneInCooldown(l.phone));
 
         if (duplicates.length > 0) {
             const queueNames = inQueue.slice(0, 2).map(d => d.name);
             const sentNames = alreadySent.slice(0, 2).map(d => d.name);
+            const cooldownNames = inCooldown.slice(0, 2).map(d => d.name);
             let warning = '';
             if (inQueue.length > 0) {
                 warning += `${queueNames.join(', ')}${inQueue.length > 2 ? ` +${inQueue.length - 2}` : ''} zaten kuyrukta. `;
             }
             if (alreadySent.length > 0) {
-                warning += `${sentNames.join(', ')}${alreadySent.length > 2 ? ` +${alreadySent.length - 2}` : ''} daha önce mesaj gönderilmiş.`;
+                warning += `${sentNames.join(', ')}${alreadySent.length > 2 ? ` +${alreadySent.length - 2}` : ''} daha önce mesaj gönderilmiş. `;
+            }
+            if (inCooldown.length > 0) {
+                warning += `🔒 ${cooldownNames.join(', ')}${inCooldown.length > 2 ? ` +${inCooldown.length - 2}` : ''} cooldown'da (aynı numara).`;
             }
             setDuplicateWarning(warning);
         }
@@ -270,7 +279,7 @@ const WhatsAppPage = () => {
 
     // Toplu seçim: sadece gönderilmemiş lead'leri seç/kaldır
     const handleSelectAll = () => {
-        const unsent = filteredLeads.filter(l => !wasSent(l.id));
+        const unsent = filteredLeads.filter(l => !wasSent(l.id) && !isPhoneInCooldown(l.phone));
         if (selectedLeads.length === unsent.length && unsent.length > 0) {
             setSelectedLeads([]);
             setPreviewLead(null);
@@ -288,7 +297,7 @@ const WhatsAppPage = () => {
         if (selectedLeads.length === 0) return { new: 0, duplicates: 0, existingIds: new Set() };
 
         const existingIds = new Set(messageQueue.map(m => m.lead.id));
-        const duplicates = selectedLeads.filter(l => existingIds.has(l.id) || wasSent(l.id)).length;
+        const duplicates = selectedLeads.filter(l => existingIds.has(l.id) || wasSent(l.id) || isPhoneInCooldown(l.phone)).length;
         const newLeads = selectedLeads.length - duplicates;
 
         return { new: newLeads, duplicates, existingIds };
@@ -371,6 +380,8 @@ const WhatsAppPage = () => {
                         onSearchChange={setSearchQuery}
                         onSelectLead={handleSelectLead}
                         onSelectAll={handleSelectAll}
+                        isPhoneInCooldown={isPhoneInCooldown}
+                        getPhoneRemainingTime={getPhoneRemainingTime}
                     />
 
                     {/* Mobile FAB to go to Workspace */}

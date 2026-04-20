@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = 'https://supabasekong-s8gc44cg0s4scogoskogs4oc.lueratech.com';
-const supabaseKey = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc2OTExODE4MCwiZXhwIjo0OTI0NzkxNzgwLCJyb2xlIjoiYW5vbiJ9.puoy6ZxX7fqXuLWFHG9GyHnEGXeZ3cEFK_sgOn5ZQk8';
+const supabaseUrl = 'https://supabasekong.vps.lueratech.com';
+const supabaseKey = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc3NjY0OTA4MCwiZXhwIjo0OTMyMzIyNjgwLCJyb2xlIjoiYW5vbiJ9.CImzgPRU5KgBRk8Ov1ktg-XCucVWS89th1kg_-B3pno';
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 

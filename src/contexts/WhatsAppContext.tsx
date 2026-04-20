@@ -3,7 +3,9 @@ import { Lead, MessageQueueItem } from '@/types/whatsapp';
 import { n8nEvolutionService } from '@/services/n8nEvolutionService';
 import { supabase } from '@/lib/supabase';
 import { useSentHistory } from '@/hooks/useSentHistory';
+import { usePhoneCooldown } from '@/hooks/usePhoneCooldown';
 import { useAuth } from '@/contexts/AuthContext';
+import { getUserInstanceName } from '@/services/n8nEvolutionService';
 
 interface SentRecord {
     leadId: string;
@@ -25,6 +27,12 @@ interface WhatsAppContextType {
     setBulkSendStatus: React.Dispatch<React.SetStateAction<"idle" | "sending" | "completed">>;
     handleSendQueue: () => Promise<void>;
     handleAddToQueue: (leadsToAdd: Lead[]) => void;
+    // Phone Cooldown
+    isPhoneInCooldown: (phone: string) => boolean;
+    getPhoneCooldownInfo: (phone: string) => any;
+    getPhoneRemainingTime: (phone: string) => string;
+    filterAvailableLeads: <T extends { phone: string }>(leads: T[]) => T[];
+    phoneCooldownCount: <T extends { phone: string }>(leads: T[]) => number;
 }
 
 const WhatsAppContext = createContext<WhatsAppContextType | null>(null);
@@ -36,6 +44,14 @@ export const WhatsAppProvider = ({ children }: { children: ReactNode }) => {
     const [bulkSendStatus, setBulkSendStatus] = useState<"idle" | "sending" | "completed">("idle");
     const [lastCompletionTime, setLastCompletionTime] = useState<Date | null>(null);
     const { markAsSent, sentLeadIds, sentRecords, wasSent, getSentFromList } = useSentHistory(user?.id);
+    const {
+        isInCooldown: isPhoneInCooldown,
+        getCooldownInfo: getPhoneCooldownInfo,
+        getRemainingTime: getPhoneRemainingTime,
+        addToCooldown,
+        filterAvailableLeads,
+        getCooldownCount: phoneCooldownCount,
+    } = usePhoneCooldown(user?.id);
     const isInitialLoad = useRef(true);
 
     // Kullanıcıya özel localStorage key
@@ -116,11 +132,19 @@ export const WhatsAppProvider = ({ children }: { children: ReactNode }) => {
             setMessageQueue(prev => prev.map(msg => msg.status === 'pending' ? { ...msg, status: 'sending' } : msg));
             setBulkSendStatus('sending');
 
-            const result = await n8nEvolutionService.sendBulkMessages(pendingItems);
+            const instanceName = user ? await getUserInstanceName(user.id) : (import.meta.env.VITE_EVOLUTION_INSTANCE_NAME || 'testwp');
+            const result = await n8nEvolutionService.sendBulkMessages(pendingItems, instanceName);
 
             if (result.success) {
                 setMessageQueue(prev => prev.map(msg => msg.status === 'sending' ? { ...msg, status: 'sent' } : msg));
                 await markAsSent(pendingItems.map(item => ({ id: item.lead.id, name: item.lead.name })));
+
+                // 🔒 Telefon numaralarını cooldown'a ekle
+                await addToCooldown(
+                    pendingItems
+                        .filter(item => item.lead.phone)
+                        .map(item => ({ phone: item.lead.phone, leadName: item.lead.name }))
+                );
             } else {
                 throw new Error("Bulk send failed");
             }
@@ -175,7 +199,13 @@ export const WhatsAppProvider = ({ children }: { children: ReactNode }) => {
             setIsSending,
             setBulkSendStatus,
             handleSendQueue,
-            handleAddToQueue
+            handleAddToQueue,
+            // Phone Cooldown
+            isPhoneInCooldown,
+            getPhoneCooldownInfo,
+            getPhoneRemainingTime,
+            filterAvailableLeads,
+            phoneCooldownCount,
         }}>
             {children}
         </WhatsAppContext.Provider>
