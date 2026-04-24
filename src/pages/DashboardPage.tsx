@@ -13,14 +13,26 @@ import { useAuth } from "@/contexts/AuthContext";
 
 export const DashboardPage = () => {
     const { user } = useAuth();
-    const [scheduleConfig, setScheduleConfig] = useState<ScheduleConfig>({
-        date: undefined,
-        time: "",
-        city: "",
-        district: "",
-        sector: "",
-        limit: 30
+    const [scheduleConfig, setScheduleConfig] = useState<ScheduleConfig>(() => {
+        const saved = localStorage.getItem('dashboard_schedule_config');
+        if (saved) {
+            try {
+                return JSON.parse(saved);
+            } catch (e) {}
+        }
+        return {
+            date: undefined,
+            time: "",
+            city: "",
+            district: "",
+            sector: "",
+            limit: 30
+        };
     });
+
+    useEffect(() => {
+        localStorage.setItem('dashboard_schedule_config', JSON.stringify(scheduleConfig));
+    }, [scheduleConfig]);
 
     const [selectedDetailLead, setSelectedDetailLead] = useState<Lead | null>(null);
     const [whatsAppLead, setWhatsAppLead] = useState<Lead | null>(null);

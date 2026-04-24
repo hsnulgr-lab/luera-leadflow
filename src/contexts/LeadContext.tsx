@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode, useRef } from 'react';
 import { Lead, ScheduleConfig } from '@/types/lead';
 import { n8nService } from '@/services/n8nService';
 import { supabase } from '@/lib/supabase';
@@ -41,6 +41,31 @@ export const LeadProvider = ({ children }: { children: ReactNode }) => {
     // Core State
     const [leads, setLeads] = useState<Lead[]>([]);
     const [selectedLeads, setSelectedLeads] = useState<Set<string>>(new Set());
+
+    const isInitialSelectedLoad = useRef(true);
+    const selectedLeadsStorageKey = user ? `selected_leads_${user.id}` : 'selected_leads';
+
+    useEffect(() => {
+        const stored = localStorage.getItem(selectedLeadsStorageKey);
+        if (stored) {
+            try {
+                const parsed = JSON.parse(stored);
+                if (Array.isArray(parsed)) {
+                    setSelectedLeads(new Set(parsed));
+                }
+            } catch (e) {
+                console.error("Error parsing selected leads", e);
+            }
+        }
+    }, [selectedLeadsStorageKey]);
+
+    useEffect(() => {
+        if (isInitialSelectedLoad.current) {
+            isInitialSelectedLoad.current = false;
+            return;
+        }
+        localStorage.setItem(selectedLeadsStorageKey, JSON.stringify(Array.from(selectedLeads)));
+    }, [selectedLeads, selectedLeadsStorageKey]);
 
     // UX State
     const [isSearching, setIsSearching] = useState(false);

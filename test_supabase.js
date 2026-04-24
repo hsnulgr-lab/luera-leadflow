@@ -15,12 +15,17 @@ async function testConnection() {
       console.log('Connection successful! Check permissions if count is null:', data);
     }
     
-    // Test Auth (optional, requires valid credentials to test fully but we can check if auth service responds)
-    const { data: authData, error: authError } = await supabase.auth.getSession();
-     if (authError) {
-      console.error('Auth check failed:', authError.message);
+    // Test Auth Sign Up to see exact error
+    console.log('Testing User Sign Up...');
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+      email: 'test_lueratech@example.com',
+      password: 'password12345',
+    });
+    
+    if (signUpError) {
+      console.error('Sign Up Error Details:', JSON.stringify(signUpError, null, 2));
     } else {
-      console.log('Auth service reachable. Session:', authData.session ? 'Active' : 'None');
+      console.log('Sign Up successful:', signUpData);
     }
 
   } catch (err) {
