@@ -93,23 +93,9 @@ export const n8nService = {
                 throw new Error(`n8n'den beklenen JSON gelmedi. Gelen veri: ${text.substring(0, 100)}...`);
             }
 
-            // Handle different response structures gracefully
-            // Handle different response structures gracefully
-            if (Array.isArray(result)) {
-                return result.map(mapN8nToLead);
-            } else if (result && typeof result === 'object') {
-                // If single object (e.g. n8n loop responding 1 by 1)
-                // Check if it has 'data' property which is an array
-                if (result.data && Array.isArray(result.data)) {
-                    return result.data.map(mapN8nToLead);
-                }
-                // Check if it's a single lead object
-                if (result["Company Name"] || result.title || result.id) {
-                    return [mapN8nToLead(result)];
-                }
-            }
-
-            return [];
+            const extractedLeads = extractLeadItems(result);
+            console.log("n8n Parsed Lead Count:", extractedLeads.length, extractedLeads);
+            return extractedLeads.map(mapN8nToLead);
         } catch (error) {
             console.error("n8n search failed:", error);
             throw error;
@@ -308,15 +294,15 @@ export const n8nService = {
 function mapN8nToLead(item: any): Lead {
     return {
         id: item.id || crypto.randomUUID(),
-        name: item["Company Name"] || item.title || "İsimsiz Şirket",
-        company: item["Company Category"] || item.categoryName || "Bilinmiyor",
-        email: item.Email || item.email || "cagrı@example.com", // Fallback for UI if missing
-        phone: item["Phone Number"] || item.phone || "",
-        status: "new",
-        website: item.Website || item.website || undefined,
+        name: item["Company Name"] || item.companyName || item.name || item.title || "İsimsiz Şirket",
+        company: item["Company Category"] || item.categoryName || item.category || item.sector || "Bilinmiyor",
+        email: item.Email || item.email || "",
+        phone: item["Phone Number"] || item.phone || item.phoneNumber || item.telephone || item.mobile || "",
+        status: normalizeStatus(item.status),
+        website: item.Website || item.website || item.url || undefined,
         score: calculateScore(item),
         lastActivity: "Yeni Eklendi",
-        tags: [item["Company Category"]].filter(Boolean),
+        tags: [item["Company Category"] || item.categoryName || item.category || item.sector].filter(Boolean),
         dateAdded: new Date().toISOString()
     };
 }
@@ -324,8 +310,86 @@ function mapN8nToLead(item: any): Lead {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function calculateScore(item: any): number {
     let score = 50;
-    if (item.Email) score += 20;
-    if (item["Phone Number"]) score += 20;
-    if (item.Website) score += 10;
+    if (item.Email || item.email) score += 20;
+    if (item["Phone Number"] || item.phone || item.phoneNumber || item.telephone || item.mobile) score += 20;
+    if (item.Website || item.website || item.url) score += 10;
     return Math.min(score, 100);
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function extractLeadItems(result: any): any[] {
+    if (!result) return [];
+
+    if (Array.isArray(result)) {
+        return result.flatMap(item => extractLeadItems(item));
+    }
+
+    if (typeof result === "string") {
+        const trimmed = result.trim();
+        if (!trimmed) return [];
+        try {
+            return extractLeadItems(JSON.parse(trimmed));
+        } catch {
+            return [];
+        }
+    }
+
+    if (isLeadLike(result)) {
+        return [result];
+    }
+
+    if (typeof result !== "object") {
+        return [];
+    }
+
+    const candidateKeys = [
+        "data",
+        "results",
+        "leads",
+        "items",
+        "body",
+        "response",
+        "output",
+        "result",
+        "records"
+    ];
+
+    for (const key of candidateKeys) {
+        if (key in result) {
+            const extracted = extractLeadItems(result[key]);
+            if (extracted.length > 0) {
+                return extracted;
+            }
+        }
+    }
+
+    return [];
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function isLeadLike(item: any): boolean {
+    if (!item || typeof item !== "object") return false;
+
+    return Boolean(
+        item["Company Name"] ||
+        item.companyName ||
+        item.name ||
+        item.title ||
+        item["Phone Number"] ||
+        item.phone ||
+        item.phoneNumber ||
+        item.telephone ||
+        item.mobile ||
+        item.Website ||
+        item.website
+    );
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function normalizeStatus(status: any): Lead["status"] {
+    if (status === "contacted" || status === "interested" || status === "closed") {
+        return status;
+    }
+
+    return "new";
 }

@@ -134,8 +134,8 @@ export const LeadProvider = ({ children }: { children: ReactNode }) => {
         fetchLeads();
     }, [fetchLeads]);
 
-    const saveLeadsToSupabase = async (newLeads: Lead[]) => {
-        if (!user) return;
+    const saveLeadsToSupabase = async (newLeads: Lead[]): Promise<Lead[]> => {
+        if (!user || newLeads.length === 0) return [];
         try {
             const leadsToInsert = newLeads.map(lead => ({
                 name: lead.name,
@@ -156,13 +156,27 @@ export const LeadProvider = ({ children }: { children: ReactNode }) => {
             if (error) {
                 console.error('SUPABASE INSERT ERROR DETAILS:', JSON.stringify(error, null, 2));
                 toast.error(`Lead'ler kaydedilemedi: ${error.message} (${error.code})`);
+                return newLeads;
             } else {
                 console.log('Leads saved successfully:', data);
+
+                const savedLeads: Lead[] = (data || []).map(item => ({
+                    id: item.id,
+                    name: item.name,
+                    company: item.company || '',
+                    email: item.email || '',
+                    phone: item.phone || '',
+                    website: item.website || '',
+                    status: item.status || 'new',
+                    priority: item.priority || null,
+                    dateAdded: item.created_at,
+                    score: item.score || 0,
+                }));
 
                 // CallFlow'a gönder (hata olsa bile lead akışını durdurmaz)
                 try {
                     const leadsWithIds: Lead[] = (data ?? []).map((d: any) => ({
-                        ...newLeads.find(l => l.phone === d.phone) ?? newLeads[0],
+                        ...(newLeads.find(l => l.phone === d.phone && l.name === d.name) ?? newLeads[0]),
                         id: d.id,
                     }));
                     const result = await sendLeadsToCallflow(leadsWithIds);
@@ -172,11 +186,16 @@ export const LeadProvider = ({ children }: { children: ReactNode }) => {
                 } catch {
                     // CallFlow hatası sessizce geç
                 }
+
+                return savedLeads.length > 0 ? savedLeads : newLeads;
             }
         } catch (err) {
             console.error('Exception saving leads:', err);
             toast.error('Lead kaydetme hatası');
+            return newLeads;
         }
+
+        return newLeads;
     };
 
     const searchLeads = async (config: ScheduleConfig) => {
@@ -188,10 +207,9 @@ export const LeadProvider = ({ children }: { children: ReactNode }) => {
         try {
             setAutomationProgress(20);
             const newLeads = await n8nService.searchLeads(config, undefined);
+            const persistedLeads = await saveLeadsToSupabase(newLeads);
 
-            await saveLeadsToSupabase(newLeads);
-
-            setLeads(prev => [...newLeads, ...prev]);
+            setLeads(prev => [...persistedLeads, ...prev]);
 
             setCompletedSteps([true, false, false, false]);
             setAutomationProgress(50);
@@ -207,7 +225,7 @@ export const LeadProvider = ({ children }: { children: ReactNode }) => {
             setAutomationProgress(100);
             setCurrentStep(3);
 
-            const leadCount = newLeads.length;
+            const leadCount = persistedLeads.length;
             toast.success(`${leadCount} lead bulundu ve kaydedildi!`);
 
             await addNotification(

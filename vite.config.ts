@@ -36,6 +36,7 @@ export default defineConfig(({ mode }) => {
         target: url.origin,
         changeOrigin: true,
         secure: false,
+        ws: true,
         rewrite: (path) => path.replace(/^\/api\/supabase/, ''),
       };
       console.log(`Proxying /api/supabase to ${url.origin}`);
