@@ -17,6 +17,10 @@ export const SettingsPage = () => {
     const [geminiKey, setGeminiKey] = useState("");
     const [evolutionInstance, setEvolutionInstance] = useState("");
 
+    // CallFlow Integration
+    const [callflowApiKey, setCallflowApiKey] = useState("");
+    const [callflowApiUrl, setCallflowApiUrl] = useState("http://localhost:3001");
+
     // General State
     const [profileName, setProfileName] = useState(user?.name || "");
     const [email, setEmail] = useState(user?.email || "");
@@ -46,6 +50,11 @@ export const SettingsPage = () => {
                 setN8nSearchUrl(data.n8n_webhook_url || import.meta.env.VITE_N8N_WEBHOOK_URL || "");
                 setGeminiKey(data.gemini_api_key || import.meta.env.VITE_GEMINI_API_KEY || "");
                 setEvolutionInstance(data.evolution_instance_name || "");
+                setCallflowApiKey(data.callflow_api_key || "");
+                setCallflowApiUrl(data.callflow_api_url || "https://callflow-production-3ce4.up.railway.app");
+
+                // localStorage'ı senkronize et — callflowService oradan okuyor
+                if (data.callflow_api_key) localStorage.setItem("callflow_api_key", data.callflow_api_key);
             } else {
                 // Supabase'de kayıt yoksa env değerlerini varsayılan olarak yükle
                 setN8nSearchUrl(import.meta.env.VITE_N8N_WEBHOOK_URL || "");
@@ -74,6 +83,8 @@ export const SettingsPage = () => {
                     n8n_webhook_url: n8nSearchUrl || null,
                     gemini_api_key: geminiKey || null,
                     evolution_instance_name: evolutionInstance || null,
+                    callflow_api_key: callflowApiKey || null,
+                    callflow_api_url: callflowApiUrl || null,
                     updated_at: new Date().toISOString(),
                 }, { onConflict: 'user_id' });
 
@@ -81,6 +92,13 @@ export const SettingsPage = () => {
                 console.error('Ayarlar kaydedilemedi:', error);
                 alert('Ayarlar kaydedilirken bir hata oluştu.');
                 return;
+            }
+
+            // localStorage'a da yaz — callflowService oradan okuyor
+            if (callflowApiKey) {
+                localStorage.setItem("callflow_api_key", callflowApiKey);
+            } else {
+                localStorage.removeItem("callflow_api_key");
             }
 
             setSuccess(true);
@@ -258,6 +276,51 @@ export const SettingsPage = () => {
                                             placeholder="user_abc123..."
                                             className="w-full px-4 py-3 rounded-lg border border-border bg-secondary/30 font-mono text-sm focus:ring-2 focus:ring-gray-200 outline-none"
                                         />
+                                    </div>
+                                </div>
+
+                                {/* CallFlow Entegrasyonu */}
+                                <div className="pt-6 border-t border-border/50">
+                                    <h2 className="text-xl font-semibold mb-1 flex items-center gap-2">
+                                        <Key className="w-5 h-5 text-[#CCFF00]" />
+                                        LUERA CallFlow
+                                    </h2>
+                                    <p className="text-sm text-muted-foreground mb-4">
+                                        Leadler otomatik olarak CallFlow'a aktarılır ve arama kampanyalarına eklenebilir.
+                                    </p>
+                                    <div className="space-y-3 max-w-xl">
+                                        <div>
+                                            <label className="text-sm font-medium mb-1.5 block">API Key</label>
+                                            <p className="text-xs text-muted-foreground mb-2">
+                                                CallFlow → Ayarlar → Entegrasyonlar'dan kopyala.
+                                            </p>
+                                            <input
+                                                type="text"
+                                                value={callflowApiKey}
+                                                onChange={(e) => setCallflowApiKey(e.target.value)}
+                                                placeholder="86f5f4b2-8cfb-4b16-8d1e-..."
+                                                className="w-full px-4 py-3 rounded-lg border border-border bg-secondary/30 font-mono text-sm focus:ring-2 focus:ring-gray-200 outline-none"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-sm font-medium mb-1.5 block">CallFlow Server URL</label>
+                                            <input
+                                                type="text"
+                                                value={callflowApiUrl}
+                                                onChange={(e) => setCallflowApiUrl(e.target.value)}
+                                                placeholder="http://localhost:3001"
+                                                className="w-full px-4 py-3 rounded-lg border border-border bg-secondary/30 font-mono text-sm focus:ring-2 focus:ring-gray-200 outline-none"
+                                            />
+                                            <p className="text-xs text-muted-foreground mt-1.5">
+                                                Production: https://callflow-server.lueratech.com
+                                            </p>
+                                        </div>
+                                        {callflowApiKey && (
+                                            <div className="flex items-center gap-2 text-xs text-emerald-600 font-medium bg-emerald-50 px-3 py-2 rounded-lg border border-emerald-100">
+                                                <span className="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0" />
+                                                Bağlantı aktif — yeni leadler otomatik CallFlow'a gönderilecek
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>

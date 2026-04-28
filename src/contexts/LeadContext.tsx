@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/contexts/NotificationContext';
+import { sendLeadsToCallflow } from '@/services/callflowService';
 
 interface LeadContextType {
     leads: Lead[];
@@ -157,6 +158,20 @@ export const LeadProvider = ({ children }: { children: ReactNode }) => {
                 toast.error(`Lead'ler kaydedilemedi: ${error.message} (${error.code})`);
             } else {
                 console.log('Leads saved successfully:', data);
+
+                // CallFlow'a gönder (hata olsa bile lead akışını durdurmaz)
+                try {
+                    const leadsWithIds: Lead[] = (data ?? []).map((d: any) => ({
+                        ...newLeads.find(l => l.phone === d.phone) ?? newLeads[0],
+                        id: d.id,
+                    }));
+                    const result = await sendLeadsToCallflow(leadsWithIds);
+                    if (result.success > 0) {
+                        toast.success(`${result.success} lead CallFlow'a aktarıldı`);
+                    }
+                } catch {
+                    // CallFlow hatası sessizce geç
+                }
             }
         } catch (err) {
             console.error('Exception saving leads:', err);
