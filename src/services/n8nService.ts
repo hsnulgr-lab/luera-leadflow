@@ -3,16 +3,21 @@ import { ScheduleConfig, Lead } from "@/types/lead";
 const WEBHOOK_ID = "e3c9c128-2078-4702-8fc2-bf55da50302c";
 const PROXY_PATH = `/api/n8n/webhook/${WEBHOOK_ID}`;
 
-// Helper to get the correct URL (Proxy in Dev, Direct in Prod)
-const getApiUrl = (key: "search" | "agent") => {
-    // In development (localhost), ALWAYS use the proxy to avoid CORS errors
+// Production'da CallFlow Bridge Server'ın n8n proxy endpoint'i kullanılır
+// (CORS sorununu çözer)
+const BRIDGE_URL =
+    (import.meta.env.VITE_CALLFLOW_API_URL as string) ||
+    "https://callflow-production-3ce4.up.railway.app";
+
+// Helper to get the correct URL
+const getApiUrl = (_key: "search" | "agent") => {
+    // Development: Vite proxy üzerinden
     if (import.meta.env.DEV) {
         return PROXY_PATH;
     }
 
-    // In production (if hosted on same domain or properly configured), use full URL or relative
-    // For now, defaulting to the full URL for production build if not proxying
-    return `https://n8n.lueratech.com/webhook/${WEBHOOK_ID}`;
+    // Production: Bridge server üzerinden proxy (CORS uyumlu)
+    return `${BRIDGE_URL}/api/n8n/webhook/${WEBHOOK_ID}`;
 };
 
 
@@ -127,7 +132,7 @@ export const n8nService = {
 
     async generateAnalyzedMessage(lead: Lead): Promise<string> {
         // Default to the user's provided URL if not set
-        const defaultAgentUrl = "https://n8n.lueratech.com/webhook/lead-agent";
+        const defaultAgentUrl = "https://callflow-production-3ce4.up.railway.app/api/n8n/webhook/lead-agent";
         const apiUrl = getApiUrl("agent") || defaultAgentUrl;
 
         if (!apiUrl) {
@@ -205,7 +210,7 @@ export const n8nService = {
         companyCategory?: string
     ): Promise<{ success: boolean; messageId?: string; error?: string }> {
         const webhookUrl = localStorage.getItem("n8n_whatsapp_single_url")
-            || "https://n8n.lueratech.com/webhook/whatsapp-send-single";
+            || "https://callflow-production-3ce4.up.railway.app/api/n8n/webhook/whatsapp-send-single";
 
         try {
             const response = await fetch(webhookUrl, {
@@ -256,7 +261,7 @@ export const n8nService = {
         results: Array<{ phone: string; success: boolean; error?: string }>;
     }> {
         const webhookUrl = localStorage.getItem("n8n_whatsapp_bulk_url")
-            || "https://n8n.lueratech.com/webhook/whatsapp-send-bulk";
+            || "https://callflow-production-3ce4.up.railway.app/api/n8n/webhook/whatsapp-send-bulk";
 
         try {
             const response = await fetch(webhookUrl, {
