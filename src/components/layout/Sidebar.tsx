@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Home, Users, BarChart2, Settings, CalendarClock, ChevronLeft, ChevronRight, MessageSquare, LogOut, User, ChevronUp } from 'lucide-react';
+import { Home, Users, BarChart2, Settings, CalendarClock, ChevronLeft, ChevronRight, MessageSquare, LogOut, User, ChevronUp, ArrowUpRight } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { useAuth } from '@/contexts/AuthContext';
 import { NotificationDropdown } from './NotificationDropdown';
@@ -27,7 +27,7 @@ export const Sidebar = ({ activeTab, onTabChange, isCollapsed, onCollapsedChange
 
     return (
         <aside className={cn(
-            "fixed left-0 top-0 h-screen bg-white/80 backdrop-blur-xl border-r border-gray-100 z-30 transition-all duration-300 ease-in-out",
+            "fixed left-0 top-0 h-screen bg-white/80 backdrop-blur-xl border-r border-gray-100 z-30 transition-all duration-300 ease-in-out flex flex-col",
             isCollapsed ? "w-20" : "w-64"
         )}>
             {/* Logo Section */}
@@ -65,7 +65,7 @@ export const Sidebar = ({ activeTab, onTabChange, isCollapsed, onCollapsedChange
             </div>
 
             {/* Navigation */}
-            <nav className="p-3 space-y-1">
+            <nav className="p-3 space-y-1 flex-1 overflow-y-auto">
                 {menuItems.map((item) => {
                     const Icon = item.icon;
                     const isActive = activeTab === item.id;
@@ -115,29 +115,49 @@ export const Sidebar = ({ activeTab, onTabChange, isCollapsed, onCollapsedChange
                 </div>
             </nav>
 
-            {/* User Profile */}
-            <div className="absolute bottom-0 w-full p-4 border-t border-gray-100 bg-white/50">
-                {/* Notification */}
-                {!isCollapsed && (
-                    <div className="flex justify-end mb-3">
-                        <NotificationDropdown />
-                    </div>
-                )}
-
-                <div className="relative">
-                    <button
-                        onClick={() => !isCollapsed && setShowUserMenu(!showUserMenu)}
-                        className={cn(
-                            "w-full flex items-center gap-3 p-2 rounded-xl hover:bg-gray-100 transition-colors",
-                            isCollapsed && "justify-center"
-                        )}
-                    >
-                        <div className="w-10 h-10 rounded-full bg-[#CCFF00] flex items-center justify-center shadow-md">
-                            <span className="font-bold text-gray-900 text-sm">{(user?.name || 'U').charAt(0).toUpperCase()}</span>
-                        </div>
+            {/* CallFlow Butonu */}
+            <div className={cn("px-3 pb-2", isCollapsed && "flex justify-center")}>
+                <a
+                    href="https://callflow.lueratech.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={cn(
+                        "flex items-center gap-2 px-3 py-2 rounded-xl",
+                        "bg-gray-100 hover:bg-gray-200 transition-all duration-200 group",
+                        isCollapsed && "justify-center"
+                    )}
+                >
+                    <div className={cn("flex items-baseline gap-2 flex-1", isCollapsed && "flex-none")}>
+                        <span className="text-2xl font-bold text-gray-900">LUERA</span>
                         {!isCollapsed && (
-                            <>
-                                <div className="flex-1 text-left">
+                            <span className="text-sm font-medium text-gray-400 group-hover:text-gray-600 transition-colors">CallFlow</span>
+                        )}
+                    </div>
+                    {!isCollapsed && (
+                        <ArrowUpRight className="w-3.5 h-3.5 text-gray-300 group-hover:text-gray-500 transition-colors flex-shrink-0" />
+                    )}
+                </a>
+            </div>
+
+            {/* User Profile */}
+            <div className="w-full p-4 border-t border-gray-100 bg-white/50 flex-shrink-0">
+                <div className="relative">
+                    <div className={cn(
+                        "flex items-center gap-3 p-2 rounded-xl",
+                        isCollapsed && "justify-center"
+                    )}>
+                        <button
+                            onClick={() => !isCollapsed && setShowUserMenu(!showUserMenu)}
+                            className={cn(
+                                "flex items-center gap-3 flex-1 min-w-0 rounded-xl hover:bg-gray-100 transition-colors p-0",
+                                isCollapsed && "justify-center flex-none"
+                            )}
+                        >
+                            <div className="w-10 h-10 rounded-full bg-[#CCFF00] flex items-center justify-center shadow-md flex-shrink-0">
+                                <span className="font-bold text-gray-900 text-sm">{(user?.name || 'U').charAt(0).toUpperCase()}</span>
+                            </div>
+                            {!isCollapsed && (
+                                <div className="flex-1 text-left min-w-0">
                                     <p className="text-sm font-semibold text-gray-900">
                                         {(user?.name || 'Kullanıcı').split(' ')[0].charAt(0).toUpperCase() + (user?.name || 'Kullanıcı').split(' ')[0].slice(1).toLowerCase()}
                                     </p>
@@ -146,13 +166,10 @@ export const Sidebar = ({ activeTab, onTabChange, isCollapsed, onCollapsedChange
                                         {user?.role || 'User'}
                                     </p>
                                 </div>
-                                <ChevronUp className={cn(
-                                    "w-4 h-4 text-gray-400 transition-transform",
-                                    !showUserMenu && "rotate-180"
-                                )} />
-                            </>
-                        )}
-                    </button>
+                            )}
+                        </button>
+                        {!isCollapsed && <NotificationDropdown />}
+                    </div>
 
                     {/* Dropdown Menu */}
                     {showUserMenu && !isCollapsed && (

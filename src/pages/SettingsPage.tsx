@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { User, Bell, Globe, Key, Webhook, Save, CheckCircle2 } from "lucide-react";
+import { User, Bell, Globe, Save, CheckCircle2, MessageSquare, Radio } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 
@@ -12,14 +12,8 @@ export const SettingsPage = () => {
     const [settingsLoaded, setSettingsLoaded] = useState(false);
 
     // Integrations State
-    const [n8nSearchUrl, setN8nSearchUrl] = useState("");
-    const [n8nAgentUrl, setN8nAgentUrl] = useState("");
-    const [geminiKey, setGeminiKey] = useState("");
     const [evolutionInstance, setEvolutionInstance] = useState("");
-
-    // CallFlow Integration
     const [callflowApiKey, setCallflowApiKey] = useState("");
-    const [callflowApiUrl, setCallflowApiUrl] = useState("http://localhost:3001");
 
     // General State
     const [profileName, setProfileName] = useState(user?.name || "");
@@ -47,18 +41,11 @@ export const SettingsPage = () => {
                 .single();
 
             if (!error && data) {
-                setN8nSearchUrl(data.n8n_webhook_url || import.meta.env.VITE_N8N_WEBHOOK_URL || "");
-                setGeminiKey(data.gemini_api_key || import.meta.env.VITE_GEMINI_API_KEY || "");
                 setEvolutionInstance(data.evolution_instance_name || "");
                 setCallflowApiKey(data.callflow_api_key || "");
-                setCallflowApiUrl(data.callflow_api_url || "https://callflow-production-3ce4.up.railway.app");
 
                 // localStorage'ı senkronize et — callflowService oradan okuyor
                 if (data.callflow_api_key) localStorage.setItem("callflow_api_key", data.callflow_api_key);
-            } else {
-                // Supabase'de kayıt yoksa env değerlerini varsayılan olarak yükle
-                setN8nSearchUrl(import.meta.env.VITE_N8N_WEBHOOK_URL || "");
-                setGeminiKey(import.meta.env.VITE_GEMINI_API_KEY || "");
             }
 
             setProfileName(user.name || "");
@@ -80,11 +67,8 @@ export const SettingsPage = () => {
                 .from('user_settings')
                 .upsert({
                     user_id: user.id,
-                    n8n_webhook_url: n8nSearchUrl || null,
-                    gemini_api_key: geminiKey || null,
                     evolution_instance_name: evolutionInstance || null,
                     callflow_api_key: callflowApiKey || null,
-                    callflow_api_url: callflowApiUrl || null,
                     updated_at: new Date().toISOString(),
                 }, { onConflict: 'user_id' });
 
@@ -199,128 +183,61 @@ export const SettingsPage = () => {
 
                         {/* INTEGRATIONS TAB */}
                         {activeTab === "integrations" && (
-                            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                            <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
                                 {!settingsLoaded && (
                                     <p className="text-sm text-muted-foreground">Ayarlar yükleniyor...</p>
                                 )}
 
-                                <div>
-                                    <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                                        <Webhook className="w-5 h-5 text-[#CCFF00]" />
-                                        n8n Webhook Bağlantıları
-                                    </h2>
-
-                                    <div className="space-y-6 max-w-xl">
-                                        <div>
-                                            <label className="text-sm font-medium mb-1.5 block">Lead Arama Webhook'u</label>
-                                            <p className="text-xs text-muted-foreground mb-2">
-                                                Google Maps scraping ve lead bulma workflow'u.
-                                            </p>
-                                            <input
-                                                type="text"
-                                                value={n8nSearchUrl}
-                                                onChange={(e) => setN8nSearchUrl(e.target.value)}
-                                                placeholder="https://.../webhook/lead-search"
-                                                className="w-full px-4 py-3 rounded-lg border border-border bg-secondary/30 font-mono text-sm focus:ring-2 focus:ring-gray-200 outline-none"
-                                            />
+                                {/* LUERA CallFlow */}
+                                <div className={`rounded-2xl border-2 p-5 transition-colors ${callflowApiKey ? "border-[#CCFF00]/60 bg-[#CCFF00]/5" : "border-border bg-background/50"}`}>
+                                    <div className="flex items-start gap-3 mb-4">
+                                        <div className="w-9 h-9 rounded-xl bg-slate-900 flex items-center justify-center flex-shrink-0">
+                                            <Radio className="w-4 h-4 text-[#CCFF00]" />
                                         </div>
-
-                                        <div>
-                                            <label className="text-sm font-medium mb-1.5 block">AI Ajan Webhook'u</label>
-                                            <p className="text-xs text-muted-foreground mb-2">
-                                                Website analizi ve mesaj yazma workflow'u.
-                                            </p>
-                                            <input
-                                                type="text"
-                                                value={n8nAgentUrl}
-                                                onChange={(e) => setN8nAgentUrl(e.target.value)}
-                                                placeholder="https://.../webhook/lead-agent"
-                                                className="w-full px-4 py-3 rounded-lg border border-border bg-secondary/30 font-mono text-sm focus:ring-2 focus:ring-gray-200 outline-none"
-                                            />
+                                        <div className="flex-1">
+                                            <p className="font-semibold text-gray-900">LUERA CallFlow</p>
+                                            <p className="text-xs text-muted-foreground">Bulunan leadler otomatik CallFlow kampanyalarına aktarılır.</p>
                                         </div>
+                                        {callflowApiKey && (
+                                            <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-full">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                                Bağlı
+                                            </span>
+                                        )}
                                     </div>
-                                </div>
-
-                                <div className="pt-6 border-t border-border/50">
-                                    <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                                        <Key className="w-5 h-5 text-[#CCFF00]" />
-                                        Google Gemini API
-                                    </h2>
-                                    <p className="text-sm text-muted-foreground mb-4">
-                                        Mesaj ve teklif oluşturma için kullanılan AI modelinin API anahtarı.
-                                    </p>
-                                    <div className="max-w-xl">
+                                    <div>
+                                        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">Bağlantı Anahtarı</label>
+                                        <p className="text-xs text-muted-foreground mb-2">CallFlow → Ayarlar → Entegrasyonlar sayfasından kopyala.</p>
                                         <input
-                                            type="password"
-                                            value={geminiKey}
-                                            onChange={(e) => setGeminiKey(e.target.value)}
-                                            placeholder="AIzaSy..."
-                                            className="w-full px-4 py-3 rounded-lg border border-border bg-secondary/30 font-mono text-sm focus:ring-2 focus:ring-gray-200 outline-none"
+                                            type="text"
+                                            value={callflowApiKey}
+                                            onChange={(e) => setCallflowApiKey(e.target.value)}
+                                            placeholder="86f5f4b2-8cfb-4b16-8d1e-..."
+                                            className="w-full px-4 py-3 rounded-xl border border-border bg-white font-mono text-sm focus:ring-2 focus:ring-[#CCFF00]/30 focus:border-[#CCFF00]/50 outline-none"
                                         />
                                     </div>
                                 </div>
 
-                                <div className="pt-6 border-t border-border/50">
-                                    <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                                        <Globe className="w-5 h-5 text-[#CCFF00]" />
-                                        WhatsApp (Evolution API)
-                                    </h2>
-                                    <p className="text-sm text-muted-foreground mb-4">
-                                        Hesabınıza ait Evolution API instance adı. Kayıt sırasında otomatik oluşturulur.
-                                    </p>
-                                    <div className="max-w-xl">
+                                {/* WhatsApp */}
+                                <div className="rounded-2xl border border-border bg-background/50 p-5">
+                                    <div className="flex items-start gap-3 mb-4">
+                                        <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center flex-shrink-0">
+                                            <MessageSquare className="w-4 h-4 text-emerald-500" />
+                                        </div>
+                                        <div>
+                                            <p className="font-semibold text-gray-900">WhatsApp</p>
+                                            <p className="text-xs text-muted-foreground">Evolution API bağlantısı. Kayıt sırasında otomatik oluşturulur.</p>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">Instance Adı</label>
                                         <input
                                             type="text"
                                             value={evolutionInstance}
                                             onChange={(e) => setEvolutionInstance(e.target.value)}
                                             placeholder="user_abc123..."
-                                            className="w-full px-4 py-3 rounded-lg border border-border bg-secondary/30 font-mono text-sm focus:ring-2 focus:ring-gray-200 outline-none"
+                                            className="w-full px-4 py-3 rounded-xl border border-border bg-white font-mono text-sm focus:ring-2 focus:ring-gray-200 outline-none"
                                         />
-                                    </div>
-                                </div>
-
-                                {/* CallFlow Entegrasyonu */}
-                                <div className="pt-6 border-t border-border/50">
-                                    <h2 className="text-xl font-semibold mb-1 flex items-center gap-2">
-                                        <Key className="w-5 h-5 text-[#CCFF00]" />
-                                        LUERA CallFlow
-                                    </h2>
-                                    <p className="text-sm text-muted-foreground mb-4">
-                                        Leadler otomatik olarak CallFlow'a aktarılır ve arama kampanyalarına eklenebilir.
-                                    </p>
-                                    <div className="space-y-3 max-w-xl">
-                                        <div>
-                                            <label className="text-sm font-medium mb-1.5 block">API Key</label>
-                                            <p className="text-xs text-muted-foreground mb-2">
-                                                CallFlow → Ayarlar → Entegrasyonlar'dan kopyala.
-                                            </p>
-                                            <input
-                                                type="text"
-                                                value={callflowApiKey}
-                                                onChange={(e) => setCallflowApiKey(e.target.value)}
-                                                placeholder="86f5f4b2-8cfb-4b16-8d1e-..."
-                                                className="w-full px-4 py-3 rounded-lg border border-border bg-secondary/30 font-mono text-sm focus:ring-2 focus:ring-gray-200 outline-none"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="text-sm font-medium mb-1.5 block">CallFlow Server URL</label>
-                                            <input
-                                                type="text"
-                                                value={callflowApiUrl}
-                                                onChange={(e) => setCallflowApiUrl(e.target.value)}
-                                                placeholder="http://localhost:3001"
-                                                className="w-full px-4 py-3 rounded-lg border border-border bg-secondary/30 font-mono text-sm focus:ring-2 focus:ring-gray-200 outline-none"
-                                            />
-                                            <p className="text-xs text-muted-foreground mt-1.5">
-                                                Production: https://callflow-server.lueratech.com
-                                            </p>
-                                        </div>
-                                        {callflowApiKey && (
-                                            <div className="flex items-center gap-2 text-xs text-emerald-600 font-medium bg-emerald-50 px-3 py-2 rounded-lg border border-emerald-100">
-                                                <span className="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0" />
-                                                Bağlantı aktif — yeni leadler otomatik CallFlow'a gönderilecek
-                                            </div>
-                                        )}
                                     </div>
                                 </div>
                             </div>
