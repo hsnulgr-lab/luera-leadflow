@@ -1,6 +1,6 @@
-import { ScheduleConfig } from '@/types/lead';
+import { ScheduleConfig, PhoneType } from '@/types/lead';
 import { Button } from '@/components/ui/button';
-import { MapPin, Briefcase, Target, Users } from 'lucide-react';
+import { MapPin, Briefcase, Target, Users, Phone } from 'lucide-react';
 
 interface SchedulePanelProps {
     config: ScheduleConfig;
@@ -106,6 +106,34 @@ export const SchedulePanel = ({ config, onConfigChange, onStartSearch, isSearchi
                             <span>75</span>
                             <span>100</span>
                         </div>
+                    </div>
+                </div>
+
+                {/* Phone Type Filter */}
+                <div className="p-4 rounded-xl bg-white border border-gray-100 shadow-sm hover:shadow-md hover:border-[#CCFF00]/30 transition-all duration-300 group">
+                    <div className="flex items-center gap-2 mb-3">
+                        <Phone className="w-4 h-4 text-[#CCFF00] group-hover:animate-bounce" />
+                        <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Telefon Tipi</span>
+                    </div>
+                    <div className="flex gap-2">
+                        {([
+                            { value: 'mobil',     label: '📱 Cep' },
+                            { value: 'sabit',     label: '☎️ Sabit' },
+                            { value: 'her ikisi', label: '✅ Her İkisi' },
+                        ] as { value: PhoneType; label: string }[]).map(opt => (
+                            <button
+                                key={opt.value}
+                                type="button"
+                                onClick={() => onConfigChange({ ...config, phoneType: opt.value })}
+                                className={`flex-1 py-2 px-3 rounded-lg text-xs font-semibold transition-all duration-200 ${
+                                    config.phoneType === opt.value
+                                        ? 'bg-[#CCFF00] text-gray-900 shadow-sm'
+                                        : 'bg-gray-50 text-gray-500 hover:bg-gray-100 border border-gray-200'
+                                }`}
+                            >
+                                {opt.label}
+                            </button>
+                        ))}
                     </div>
                 </div>
 

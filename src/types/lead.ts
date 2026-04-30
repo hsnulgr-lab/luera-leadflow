@@ -16,6 +16,8 @@ export interface Lead {
     tags?: string[];
 }
 
+export type PhoneType = 'mobil' | 'sabit' | 'her ikisi';
+
 export interface ScheduleConfig {
     date: Date | undefined;
     time: string;
@@ -23,4 +25,5 @@ export interface ScheduleConfig {
     district: string;
     sector: string;
     limit: number;
+    phoneType: PhoneType;
 }

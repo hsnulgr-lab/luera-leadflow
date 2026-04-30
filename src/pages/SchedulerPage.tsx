@@ -164,7 +164,8 @@ export const SchedulerPage = () => {
             sector,
             limit,
             date: selectedDate,
-            time
+            time,
+            phoneType: "her ikisi"
         }, scheduledDate);
 
         // Reset form

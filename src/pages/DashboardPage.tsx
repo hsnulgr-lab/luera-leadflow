@@ -26,7 +26,8 @@ export const DashboardPage = () => {
             city: "",
             district: "",
             sector: "",
-            limit: 30
+            limit: 30,
+            phoneType: "her ikisi" as const
         };
     });
 

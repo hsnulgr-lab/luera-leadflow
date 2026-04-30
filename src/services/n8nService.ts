@@ -49,6 +49,7 @@ export const n8nService = {
             "Semt": config.district || "",
             "Sektor": config.sector,
             "Taranacak İşletme Sayısı": config.limit || 30,
+            "phoneType": config.phoneType || "her ikisi",
             "scheduledTime": scheduledTime,
             // Critical Scraper Settings
             "scrapeContacts": true,
