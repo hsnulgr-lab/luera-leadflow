@@ -307,7 +307,9 @@ function mapN8nToLead(item: any): Lead {
         dateAdded: new Date().toISOString(),
         linkedin: item["LinkedIn URL"] || item.linkedin || undefined,
         hunterEmail: item["Hunter Email"] || undefined,
-        employeeCount: item["Çalışan Sayısı"] || undefined
+        employeeCount: item["Çalışan Sayısı"] || undefined,
+        instagram: item["Instagram"] || item.instagram || undefined,
+        facebook: item["Facebook"] || item.facebook || undefined,
     };
 }
 

@@ -17,6 +17,8 @@ export interface Lead {
     linkedin?: string;
     hunterEmail?: string;
     employeeCount?: string | number;
+    instagram?: string;
+    facebook?: string;
 }
 
 export type PhoneType   = 'mobil' | 'sabit' | 'her ikisi';

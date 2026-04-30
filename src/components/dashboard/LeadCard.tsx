@@ -1,5 +1,5 @@
 import { Lead, LeadPriority } from '@/types/lead';
-import { Mail, Phone, Flame, Thermometer, Snowflake, ExternalLink, Linkedin } from 'lucide-react';
+import { Mail, Phone, Flame, Thermometer, Snowflake, ExternalLink, Linkedin, Instagram } from 'lucide-react';
 import { cn } from '@/utils/cn';
 
 interface LeadCardProps {
@@ -155,9 +155,9 @@ export const LeadCard = ({ lead, onPriorityChange, onClick }: LeadCardProps) => 
                         <ExternalLink className="w-3 h-3" />
                     </a>
                 )}
-                {(lead as any).linkedin && (
+                {lead.linkedin && (
                     <a
-                        href={(lead as any).linkedin}
+                        href={lead.linkedin}
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={(e) => e.stopPropagation()}
@@ -165,6 +165,18 @@ export const LeadCard = ({ lead, onPriorityChange, onClick }: LeadCardProps) => 
                         title="LinkedIn"
                     >
                         <Linkedin className="w-3 h-3" />
+                    </a>
+                )}
+                {lead.instagram && (
+                    <a
+                        href={lead.instagram.startsWith('http') ? lead.instagram : `https://instagram.com/${lead.instagram}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="p-1.5 rounded-lg bg-pink-50 text-pink-500 hover:bg-pink-100 transition-colors"
+                        title="Instagram"
+                    >
+                        <Instagram className="w-3 h-3" />
                     </a>
                 )}
             </div>
