@@ -1,5 +1,5 @@
 import { Lead, LeadPriority } from '@/types/lead';
-import { Mail, Phone, Flame, Thermometer, Snowflake, ExternalLink } from 'lucide-react';
+import { Mail, Phone, Flame, Thermometer, Snowflake, ExternalLink, Linkedin } from 'lucide-react';
 import { cn } from '@/utils/cn';
 
 interface LeadCardProps {
@@ -153,6 +153,18 @@ export const LeadCard = ({ lead, onPriorityChange, onClick }: LeadCardProps) => 
                         className="p-1.5 rounded-lg bg-gray-50 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
                     >
                         <ExternalLink className="w-3 h-3" />
+                    </a>
+                )}
+                {(lead as any).linkedin && (
+                    <a
+                        href={(lead as any).linkedin}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="p-1.5 rounded-lg bg-blue-50 text-blue-500 hover:bg-blue-100 transition-colors"
+                        title="LinkedIn"
+                    >
+                        <Linkedin className="w-3 h-3" />
                     </a>
                 )}
             </div>

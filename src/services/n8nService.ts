@@ -304,7 +304,10 @@ function mapN8nToLead(item: any): Lead {
         score: calculateScore(item),
         lastActivity: "Yeni Eklendi",
         tags: [item["Company Category"] || item.categoryName || item.category || item.sector].filter(Boolean),
-        dateAdded: new Date().toISOString()
+        dateAdded: new Date().toISOString(),
+        linkedin: item["LinkedIn URL"] || item.linkedin || undefined,
+        hunterEmail: item["Hunter Email"] || undefined,
+        employeeCount: item["Çalışan Sayısı"] || undefined
     };
 }
 

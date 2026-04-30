@@ -165,7 +165,8 @@ export const SchedulerPage = () => {
             limit,
             date: selectedDate,
             time,
-            phoneType: "her ikisi"
+            phoneType: "her ikisi",
+            emailFilter: "hepsi"
         }, scheduledDate);
 
         // Reset form

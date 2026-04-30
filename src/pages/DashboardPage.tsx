@@ -27,7 +27,8 @@ export const DashboardPage = () => {
             district: "",
             sector: "",
             limit: 30,
-            phoneType: "her ikisi" as const
+            phoneType: "her ikisi" as const,
+            emailFilter: "hepsi" as const
         };
     });
 
@@ -65,6 +66,16 @@ export const DashboardPage = () => {
         { label: "İletişim Bilgileri Doğrulanıyor", completed: completedSteps[2] },
         { label: "Sonuçlar Sisteme İşleniyor", completed: completedSteps[3] },
     ];
+
+    const hasValidEmail = (lead: Lead) =>
+        !!(lead.email && lead.email !== 'N/A' && lead.email !== 'n/a' && lead.email.includes('@'));
+
+    const filteredLeads = leads.filter(lead => {
+        const ef = scheduleConfig.emailFilter;
+        if (ef === 'var')  return hasValidEmail(lead);
+        if (ef === 'yok')  return !hasValidEmail(lead);
+        return true;
+    });
 
     const [sentCount, setSentCount] = useState(0);
     const [pendingCount, setPendingCount] = useState(0);
@@ -471,7 +482,7 @@ export const DashboardPage = () => {
                                     </div>
                                 ) : (
                                     <div className="space-y-1.5 max-h-[calc(100vh-400px)] overflow-y-auto pr-1 custom-scrollbar">
-                                        {leads.map((lead) => (
+                                        {filteredLeads.map((lead) => (
                                             <LeadCard
                                                 key={lead.id}
                                                 lead={lead}

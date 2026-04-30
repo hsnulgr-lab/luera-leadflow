@@ -1,7 +1,7 @@
 import React from 'react';
-import { ScheduleConfig, PhoneType } from '@/types/lead';
+import { ScheduleConfig, PhoneType, EmailFilter } from '@/types/lead';
 import { Button } from '@/components/ui/button';
-import { MapPin, Briefcase, Target, Users, Smartphone, PhoneCall, Phone } from 'lucide-react';
+import { MapPin, Briefcase, Target, Users, Smartphone, PhoneCall, Phone, Mail, MailX, MailCheck } from 'lucide-react';
 
 interface SchedulePanelProps {
     config: ScheduleConfig;
@@ -127,6 +127,34 @@ export const SchedulePanel = ({ config, onConfigChange, onStartSearch, isSearchi
                                 onClick={() => onConfigChange({ ...config, phoneType: value })}
                                 className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all duration-200 ${
                                     config.phoneType === value
+                                        ? 'bg-white text-gray-900 shadow-sm'
+                                        : 'text-gray-400 hover:text-gray-600'
+                                }`}
+                            >
+                                <Icon className="w-3.5 h-3.5" />
+                                {label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Email Filter */}
+                <div className="px-1">
+                    <div className="flex items-center justify-between mb-2 px-1">
+                        <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">E-Posta</span>
+                    </div>
+                    <div className="flex gap-1.5 p-1 bg-gray-100 rounded-xl">
+                        {([
+                            { value: 'var',   label: 'Var',   Icon: MailCheck },
+                            { value: 'yok',   label: 'Yok',   Icon: MailX },
+                            { value: 'hepsi', label: 'Hepsi', Icon: Mail },
+                        ] as { value: EmailFilter; label: string; Icon: React.ElementType }[]).map(({ value, label, Icon }) => (
+                            <button
+                                key={value}
+                                type="button"
+                                onClick={() => onConfigChange({ ...config, emailFilter: value })}
+                                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all duration-200 ${
+                                    config.emailFilter === value
                                         ? 'bg-white text-gray-900 shadow-sm'
                                         : 'text-gray-400 hover:text-gray-600'
                                 }`}

@@ -14,9 +14,13 @@ export interface Lead {
     score?: number;
     lastActivity?: string;
     tags?: string[];
+    linkedin?: string;
+    hunterEmail?: string;
+    employeeCount?: string | number;
 }
 
-export type PhoneType = 'mobil' | 'sabit' | 'her ikisi';
+export type PhoneType   = 'mobil' | 'sabit' | 'her ikisi';
+export type EmailFilter = 'var' | 'yok' | 'hepsi';
 
 export interface ScheduleConfig {
     date: Date | undefined;
@@ -26,4 +30,5 @@ export interface ScheduleConfig {
     sector: string;
     limit: number;
     phoneType: PhoneType;
+    emailFilter: EmailFilter;
 }
