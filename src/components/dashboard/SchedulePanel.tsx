@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ScheduleConfig, PhoneType, EmailFilter } from '@/types/lead';
 import { Button } from '@/components/ui/button';
-import { MapPin, Briefcase, Target, Users, Smartphone, PhoneCall, Phone, Mail, MailX, MailCheck } from 'lucide-react';
+import { MapPin, Briefcase, Target, Users, Smartphone, PhoneCall, Phone, Mail, MailX, MailCheck, SlidersHorizontal } from 'lucide-react';
 
 interface SchedulePanelProps {
     config: ScheduleConfig;
@@ -11,6 +11,13 @@ interface SchedulePanelProps {
 }
 
 export const SchedulePanel = ({ config, onConfigChange, onStartSearch, isSearching }: SchedulePanelProps) => {
+    const [showFilters, setShowFilters] = useState(false);
+
+    const activeFilterCount = [
+        config.phoneType  !== 'her ikisi' ? 1 : 0,
+        config.emailFilter !== 'hepsi'    ? 1 : 0,
+    ].reduce((a, b) => a + b, 0);
+
     return (
         <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white to-gray-50 border border-gray-200/50 shadow-2xl shadow-gray-200/50">
             {/* Animated Floating Orbs */}
@@ -86,8 +93,28 @@ export const SchedulePanel = ({ config, onConfigChange, onStartSearch, isSearchi
                             <Users className="w-4 h-4 text-[#CCFF00] group-hover:animate-bounce" />
                             <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">İşletme Sayısı</span>
                         </div>
-                        <div className="px-3 py-1 rounded-lg bg-[#CCFF00] text-gray-900 font-bold text-sm shadow-sm">
-                            {config.limit}
+                        <div className="flex items-center gap-2">
+                            <div className="px-3 py-1 rounded-lg bg-[#CCFF00] text-gray-900 font-bold text-sm shadow-sm">
+                                {config.limit}
+                            </div>
+                            {/* Filtre toggle butonu */}
+                            <button
+                                type="button"
+                                onClick={() => setShowFilters(v => !v)}
+                                className={`relative p-1.5 rounded-lg transition-all duration-200 ${
+                                    showFilters
+                                        ? 'bg-gray-900 text-white'
+                                        : 'bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600'
+                                }`}
+                                title="Filtreler"
+                            >
+                                <SlidersHorizontal className="w-3.5 h-3.5" />
+                                {activeFilterCount > 0 && (
+                                    <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-[#CCFF00] text-gray-900 text-[9px] font-bold rounded-full flex items-center justify-center">
+                                        {activeFilterCount}
+                                    </span>
+                                )}
+                            </button>
                         </div>
                     </div>
                     <div className="relative">
@@ -110,16 +137,18 @@ export const SchedulePanel = ({ config, onConfigChange, onStartSearch, isSearchi
                     </div>
                 </div>
 
+                {/* Filtreler — toggle ile açılır */}
+                {showFilters && (<>
                 {/* Phone Type Filter */}
-                <div className="px-1">
+                <div className="px-1 animate-in fade-in slide-in-from-top-2 duration-200">
                     <div className="flex items-center justify-between mb-2 px-1">
                         <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Telefon</span>
                     </div>
                     <div className="flex gap-1.5 p-1 bg-gray-100 rounded-xl">
                         {([
-                            { value: 'mobil',     label: 'Cep',      Icon: Smartphone },
-                            { value: 'sabit',     label: 'Sabit',    Icon: Phone },
-                            { value: 'her ikisi', label: 'Hepsi',    Icon: PhoneCall },
+                            { value: 'mobil',     label: 'Cep',   Icon: Smartphone },
+                            { value: 'sabit',     label: 'Sabit', Icon: Phone },
+                            { value: 'her ikisi', label: 'Hepsi', Icon: PhoneCall },
                         ] as { value: PhoneType; label: string; Icon: React.ElementType }[]).map(({ value, label, Icon }) => (
                             <button
                                 key={value}
@@ -139,7 +168,7 @@ export const SchedulePanel = ({ config, onConfigChange, onStartSearch, isSearchi
                 </div>
 
                 {/* Email Filter */}
-                <div className="px-1">
+                <div className="px-1 animate-in fade-in slide-in-from-top-2 duration-200">
                     <div className="flex items-center justify-between mb-2 px-1">
                         <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">E-Posta</span>
                     </div>
@@ -165,6 +194,7 @@ export const SchedulePanel = ({ config, onConfigChange, onStartSearch, isSearchi
                         ))}
                     </div>
                 </div>
+            </>)}
 
                 {/* Action Button with enhanced animations */}
                 <div className="relative group">
