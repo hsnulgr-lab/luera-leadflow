@@ -1,6 +1,7 @@
+import React from 'react';
 import { ScheduleConfig, PhoneType } from '@/types/lead';
 import { Button } from '@/components/ui/button';
-import { MapPin, Briefcase, Target, Users, Phone } from 'lucide-react';
+import { MapPin, Briefcase, Target, Users, Smartphone, PhoneCall, Phone } from 'lucide-react';
 
 interface SchedulePanelProps {
     config: ScheduleConfig;
@@ -110,28 +111,28 @@ export const SchedulePanel = ({ config, onConfigChange, onStartSearch, isSearchi
                 </div>
 
                 {/* Phone Type Filter */}
-                <div className="p-4 rounded-xl bg-white border border-gray-100 shadow-sm hover:shadow-md hover:border-[#CCFF00]/30 transition-all duration-300 group">
-                    <div className="flex items-center gap-2 mb-3">
-                        <Phone className="w-4 h-4 text-[#CCFF00] group-hover:animate-bounce" />
-                        <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Telefon Tipi</span>
+                <div className="px-1">
+                    <div className="flex items-center justify-between mb-2 px-1">
+                        <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Telefon</span>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-1.5 p-1 bg-gray-100 rounded-xl">
                         {([
-                            { value: 'mobil',     label: '📱 Cep' },
-                            { value: 'sabit',     label: '☎️ Sabit' },
-                            { value: 'her ikisi', label: '✅ Her İkisi' },
-                        ] as { value: PhoneType; label: string }[]).map(opt => (
+                            { value: 'mobil',     label: 'Cep',      Icon: Smartphone },
+                            { value: 'sabit',     label: 'Sabit',    Icon: Phone },
+                            { value: 'her ikisi', label: 'Hepsi',    Icon: PhoneCall },
+                        ] as { value: PhoneType; label: string; Icon: React.ElementType }[]).map(({ value, label, Icon }) => (
                             <button
-                                key={opt.value}
+                                key={value}
                                 type="button"
-                                onClick={() => onConfigChange({ ...config, phoneType: opt.value })}
-                                className={`flex-1 py-2 px-3 rounded-lg text-xs font-semibold transition-all duration-200 ${
-                                    config.phoneType === opt.value
-                                        ? 'bg-[#CCFF00] text-gray-900 shadow-sm'
-                                        : 'bg-gray-50 text-gray-500 hover:bg-gray-100 border border-gray-200'
+                                onClick={() => onConfigChange({ ...config, phoneType: value })}
+                                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all duration-200 ${
+                                    config.phoneType === value
+                                        ? 'bg-white text-gray-900 shadow-sm'
+                                        : 'text-gray-400 hover:text-gray-600'
                                 }`}
                             >
-                                {opt.label}
+                                <Icon className="w-3.5 h-3.5" />
+                                {label}
                             </button>
                         ))}
                     </div>
