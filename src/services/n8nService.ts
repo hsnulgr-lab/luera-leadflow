@@ -310,6 +310,9 @@ function mapN8nToLead(item: any): Lead {
         employeeCount: item["Çalışan Sayısı"] || undefined,
         instagram: item["Instagram"] || item.instagram || undefined,
         facebook: item["Facebook"] || item.facebook || undefined,
+        address: item.Address || item.address || undefined,
+        rating: item.Rating || item.rating || undefined,
+        apolloSector: item["Apollo Sektör"] || item.apolloSector || undefined,
     };
 }
 

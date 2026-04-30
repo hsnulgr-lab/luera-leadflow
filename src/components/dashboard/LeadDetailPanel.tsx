@@ -1,6 +1,5 @@
-import { X, Mail, Phone, Calendar, Building, Tag, Target, MessageCircle, Globe, ExternalLink, ArrowUpRight, Trash2 } from "lucide-react";
+import { X, Mail, Phone, Globe, MapPin, Star, Users, Linkedin, Instagram, Building, Tag, Trash2, MessageCircle, PhoneCall } from "lucide-react";
 import { Lead } from "@/types/lead";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/utils/cn";
 import { useLeads } from "@/hooks/useLeads";
 
@@ -11,174 +10,212 @@ interface LeadDetailPanelProps {
     variant?: 'modal' | 'inline';
 }
 
+const hasValidEmail = (email?: string) =>
+    !!(email && email !== 'N/A' && email !== 'n/a' && email.includes('@'));
+
 export const LeadDetailPanel = ({ lead, onClose, onAgentStart, variant = 'modal' }: LeadDetailPanelProps) => {
     const { deleteLead } = useLeads();
 
     if (!lead) return null;
 
     const handleDelete = async () => {
-        if (!lead || !window.confirm("Bu lead'i silmek istediğinize emin misiniz?")) return;
+        if (!window.confirm("Bu lead'i silmek istediğinize emin misiniz?")) return;
         await deleteLead(lead.id);
         onClose();
     };
 
-    const handleWhatsApp = () => {
-        const phone = lead.phone.replace(/[^\d]/g, '');
-        if (phone) {
-            window.open(`https://wa.me/${phone}`, '_blank');
-        } else {
-            alert("Geçerli bir telefon numarası bulunamadı.");
-        }
-    };
+    const phone = lead.phone?.replace(/[^\d+]/g, '') || '';
+    const waUrl  = phone ? `https://wa.me/${phone.startsWith('+') ? phone.slice(1) : phone}` : null;
+    const callUrl = phone ? `tel:${lead.phone}` : null;
+    const emailUrl = hasValidEmail(lead.email) ? `mailto:${lead.email}` : null;
+    const webUrl = lead.website
+        ? (lead.website.startsWith('http') ? lead.website : `https://${lead.website}`)
+        : null;
+
+    const quickActions = [
+        { label: 'WhatsApp', icon: MessageCircle, url: waUrl, color: 'bg-[#25D366] hover:bg-[#1ebe5d] text-white', disabled: !waUrl },
+        { label: 'Ara',       icon: PhoneCall,    url: callUrl, color: 'bg-gray-900 hover:bg-black text-white', disabled: !callUrl },
+        { label: 'E-posta',   icon: Mail,         url: emailUrl, color: 'bg-blue-500 hover:bg-blue-600 text-white', disabled: !emailUrl },
+        { label: 'Website',   icon: Globe,        url: webUrl,  color: 'bg-purple-500 hover:bg-purple-600 text-white', disabled: !webUrl },
+    ];
+
+    const infoRows = [
+        lead.email && { icon: Mail,   label: 'E-Posta',  value: lead.email,   href: emailUrl, dimmed: !hasValidEmail(lead.email) },
+        lead.phone && { icon: Phone,  label: 'Telefon',  value: lead.phone,   href: callUrl },
+        lead.address && { icon: MapPin, label: 'Adres',   value: lead.address, href: null },
+    ].filter(Boolean) as { icon: any; label: string; value: string; href: string | null; dimmed?: boolean }[];
+
+    const enrichRows = [
+        lead.hunterEmail && hasValidEmail(lead.hunterEmail) && {
+            icon: Mail, label: 'Hunter Email', value: lead.hunterEmail, href: `mailto:${lead.hunterEmail}`,
+            badge: 'Hunter', badgeColor: 'bg-orange-50 text-orange-600',
+        },
+        lead.linkedin && {
+            icon: Linkedin, label: 'LinkedIn', value: lead.linkedin.replace(/^https?:\/\/(www\.)?/i,'').split('/').slice(0,3).join('/'),
+            href: lead.linkedin, badge: 'LinkedIn', badgeColor: 'bg-blue-50 text-blue-600',
+        },
+        lead.instagram && {
+            icon: Instagram, label: 'Instagram', value: '@' + (lead.instagram.replace(/^https?:\/\/(www\.)?instagram\.com\//i,'').replace(/\//,'')),
+            href: lead.instagram.startsWith('http') ? lead.instagram : `https://instagram.com/${lead.instagram}`,
+            badge: 'IG', badgeColor: 'bg-pink-50 text-pink-600',
+        },
+        lead.apolloSector && {
+            icon: Building, label: 'Sektör (Apollo)', value: lead.apolloSector, href: null,
+            badge: 'Apollo', badgeColor: 'bg-gray-100 text-gray-500',
+        },
+    ].filter(Boolean) as { icon: any; label: string; value: string; href: string | null; badge: string; badgeColor: string }[];
 
     const content = (
         <div className={cn(
-            "relative w-full bg-white rounded-[32px] overflow-hidden flex flex-col font-sans",
-            variant === 'modal' ? "max-w-lg shadow-2xl animate-in fade-in zoom-in-95 duration-300" : "h-full shadow-none border-0 bg-transparent"
+            "relative w-full bg-white flex flex-col font-sans",
+            variant === 'modal'
+                ? "max-w-md rounded-3xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-300"
+                : "h-full"
         )}>
-            {/* Top Decoration */}
-            <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-br from-[#CCFF00]/10 via-green-50/20 to-transparent pointer-events-none" />
-            <div className="absolute -top-10 -right-10 w-40 h-40 bg-[#CCFF00]/10 rounded-full blur-3xl pointer-events-none" />
+            {/* Gradient top bar */}
+            <div className="h-1 w-full bg-gradient-to-r from-[#CCFF00] via-green-300 to-[#CCFF00]" />
 
-            {/* Header / Title Section */}
-            <div className="relative p-8 pb-4 flex items-start justify-between z-10 shrink-0">
-                <div className="space-y-4">
-                    {/* Tags */}
-                    <div className="flex flex-wrap gap-2">
+            {/* Header */}
+            <div className="px-6 pt-5 pb-4 flex items-start justify-between gap-3 border-b border-gray-100">
+                <div className="min-w-0">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <span className={cn(
-                            "px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider",
+                            "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
                             lead.status === 'new' ? "bg-[#CCFF00]/20 text-[#6d8a00]" : "bg-gray-100 text-gray-500"
                         )}>
                             {lead.status === 'new' ? 'YENİ' : lead.status === 'contacted' ? 'İLETİŞİM' : lead.status}
                         </span>
-                        {lead.score && (
-                            <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-purple-50 text-purple-600 flex items-center gap-1">
-                                <Target className="w-3 h-3" />
-                                SKOR: {lead.score}
+                        {lead.rating && (
+                            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-600">
+                                <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400" />
+                                {lead.rating}
+                            </span>
+                        )}
+                        {lead.score != null && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-600">
+                                Skor {lead.score}
                             </span>
                         )}
                     </div>
-
-                    <div>
-                        <h2 className="text-3xl font-black text-gray-900 tracking-tight leading-none mb-2">{lead.name}</h2>
-                        <div className="flex items-center gap-2 text-gray-400 font-medium text-sm">
-                            <Building className="w-4 h-4" />
-                            <span>{lead.company}</span>
-                        </div>
-                    </div>
+                    <h2 className="text-xl font-black text-gray-900 leading-tight truncate">{lead.name}</h2>
+                    <p className="text-sm text-gray-400 mt-0.5 flex items-center gap-1 truncate">
+                        <Tag className="w-3 h-3 shrink-0" />
+                        {lead.company}
+                        {lead.employeeCount && (
+                            <span className="ml-1 flex items-center gap-0.5 text-gray-400">
+                                <Users className="w-3 h-3" />
+                                {lead.employeeCount} çalışan
+                            </span>
+                        )}
+                    </p>
                 </div>
-
                 <button
                     onClick={onClose}
-                    className="w-8 h-8 rounded-full bg-gray-50 hover:bg-gray-100 flex items-center justify-center transition-colors -mr-2 -mt-2"
+                    className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors shrink-0"
                 >
-                    <X className="w-4 h-4 text-gray-400" />
+                    <X className="w-4 h-4 text-gray-500" />
                 </button>
             </div>
 
-            {/* Content Body */}
-            <div className="p-8 pt-2 space-y-6 overflow-y-auto no-scrollbar flex-1">
+            {/* Scrollable body */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-4 no-scrollbar">
 
-                {/* Information Card */}
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-4 relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 w-20 h-20 bg-gray-50 rounded-bl-full -mr-10 -mt-10 transition-transform group-hover:scale-110" />
-
-                    {/* Email Row */}
-                    <div className="flex items-start gap-4 relative z-10 p-2 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer group/item" onClick={() => window.open(`mailto:${lead.email}`)}>
-                        <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                            <Mail className="w-5 h-5" />
-                        </div>
-                        <div className="flex-1">
-                            <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">E-POSTA</p>
-                            <p className="font-bold text-gray-900 text-sm mt-0.5">{lead.email || "N/A"}</p>
-                        </div>
-                        <ArrowUpRight className="w-4 h-4 text-gray-300 opacity-0 group-hover/item:opacity-100 transition-all" />
-                    </div>
-
-                    {/* Phone Row */}
-                    <div className="flex items-start gap-4 relative z-10 p-2 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer group/item" onClick={handleWhatsApp}>
-                        <div className="w-10 h-10 rounded-xl bg-[#CCFF00]/20 text-[#7a9900] flex items-center justify-center shrink-0">
-                            <Phone className="w-5 h-5" />
-                        </div>
-                        <div className="flex-1">
-                            <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">TELEFON</p>
-                            <p className="font-bold text-gray-900 text-sm mt-0.5 font-mono">{lead.phone}</p>
-                        </div>
-                        <ArrowUpRight className="w-4 h-4 text-gray-300 opacity-0 group-hover/item:opacity-100 transition-all" />
-                    </div>
-                </div>
-
-                {/* Metadata Grid */}
-                <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-gray-50/50 p-4 rounded-2xl border border-gray-100 hover:border-gray-200 transition-colors">
-                        <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-500 flex items-center justify-center mb-3">
-                            <Calendar className="w-4 h-4" />
-                        </div>
-                        <div className="text-lg font-bold text-gray-900">{new Date(lead.dateAdded).toLocaleDateString()}</div>
-                        <div className="text-xs text-gray-400 font-medium mt-1">Eklendiği tarih</div>
-                    </div>
-
-                    <div className="bg-gray-50/50 p-4 rounded-2xl border border-gray-100 hover:border-gray-200 transition-colors">
-                        <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-500 flex items-center justify-center mb-3">
-                            <Tag className="w-4 h-4" />
-                        </div>
-                        <div className="text-lg font-bold text-gray-900 truncate">{lead.tags?.[0] || lead.company}</div>
-                        <div className="text-xs text-gray-400 font-medium mt-1">Sektör</div>
-                    </div>
-                </div>
-
-                {/* Actions */}
-                <div className="pt-2">
-                    <div className={cn(
-                        "grid gap-3",
-                        lead.website ? "grid-cols-2" : "grid-cols-1"
-                    )}>
-                        <Button
-                            className="h-12 bg-[#CCFF00] hover:bg-[#b8e600] text-gray-900 border-0 rounded-xl font-bold shadow-lg shadow-[#CCFF00]/20 hover:shadow-[#CCFF00]/40 transition-all"
-                            onClick={handleWhatsApp}
+                {/* Quick action buttons */}
+                <div className="grid grid-cols-4 gap-2">
+                    {quickActions.map(({ label, icon: Icon, url, color, disabled }) => (
+                        <button
+                            key={label}
+                            disabled={disabled}
+                            onClick={() => url && window.open(url, '_blank')}
+                            className={cn(
+                                "flex flex-col items-center justify-center gap-1.5 py-3 rounded-2xl text-xs font-semibold transition-all",
+                                disabled ? "bg-gray-50 text-gray-300 cursor-not-allowed" : cn(color, "shadow-sm hover:shadow-md hover:scale-[1.03] active:scale-[0.97]")
+                            )}
                         >
-                            <MessageCircle className="w-5 h-5 mr-2" />
-                            WhatsApp
-                        </Button>
+                            <Icon className="w-5 h-5" />
+                            {label}
+                        </button>
+                    ))}
+                </div>
 
-                        {lead.website && (
-                            <Button
-                                className="h-12 bg-gray-900 hover:bg-black text-white rounded-xl font-bold shadow-lg hover:shadow-xl transition-all"
-                                onClick={() => window.open(lead.website?.startsWith('http') ? lead.website : `https://${lead.website}`, '_blank')}
+                {/* Contact info */}
+                {infoRows.length > 0 && (
+                    <div className="rounded-2xl border border-gray-100 divide-y divide-gray-50 overflow-hidden">
+                        {infoRows.map(({ icon: Icon, label, value, href, dimmed }) => (
+                            <div
+                                key={label}
+                                className={cn(
+                                    "flex items-center gap-3 px-4 py-3 transition-colors",
+                                    href ? "hover:bg-gray-50 cursor-pointer" : "bg-white"
+                                )}
+                                onClick={() => href && window.open(href, '_self')}
                             >
-                                <Globe className="w-5 h-5 mr-2" />
-                                Web Sitesi
-                            </Button>
-                        )}
+                                <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center shrink-0">
+                                    <Icon className="w-4 h-4 text-gray-500" />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{label}</p>
+                                    <p className={cn("text-sm font-semibold truncate mt-0.5", dimmed ? "text-gray-400 italic" : "text-gray-900")}>
+                                        {value}
+                                    </p>
+                                </div>
+                            </div>
+                        ))}
                     </div>
+                )}
 
-                    <div className="mt-4 flex justify-center">
-                        <Button
-                            variant="ghost"
-                            className="text-red-500 hover:text-red-600 hover:bg-red-50/50 h-10 px-4 text-xs font-semibold rounded-xl"
-                            onClick={handleDelete}
-                        >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Sistemden Sil
-                        </Button>
+                {/* Enrichment data */}
+                {enrichRows.length > 0 && (
+                    <div>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">Zenginleştirilmiş Veri</p>
+                        <div className="rounded-2xl border border-gray-100 divide-y divide-gray-50 overflow-hidden">
+                            {enrichRows.map(({ icon: Icon, label, value, href, badge, badgeColor }) => (
+                                <div
+                                    key={label}
+                                    className={cn(
+                                        "flex items-center gap-3 px-4 py-3 transition-colors",
+                                        href ? "hover:bg-gray-50 cursor-pointer" : "bg-white"
+                                    )}
+                                    onClick={() => href && window.open(href, '_blank')}
+                                >
+                                    <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center shrink-0">
+                                        <Icon className="w-4 h-4 text-gray-500" />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{label}</p>
+                                        <p className="text-sm font-semibold text-gray-900 truncate mt-0.5">{value}</p>
+                                    </div>
+                                    <span className={cn("text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0", badgeColor)}>
+                                        {badge}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
                     </div>
-                </div>
+                )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-5 py-4 border-t border-gray-100 flex justify-center">
+                <button
+                    onClick={handleDelete}
+                    className="flex items-center gap-1.5 text-xs font-semibold text-red-400 hover:text-red-600 hover:bg-red-50 px-3 py-2 rounded-xl transition-colors"
+                >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Sistemden Sil
+                </button>
             </div>
         </div>
     );
 
-    if (variant === 'inline') {
-        return content;
-    }
+    if (variant === 'inline') return content;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200">
-            {/* Backdrop */}
-            <div
-                className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm transition-opacity"
-                onClick={onClose}
-            />
-            {content}
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-6 animate-in fade-in duration-200">
+            <div className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative w-full sm:max-w-md">
+                {content}
+            </div>
         </div>
     );
 };
