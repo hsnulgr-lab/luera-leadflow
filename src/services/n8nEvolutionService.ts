@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/supabase';
 
 const PROXY_BASE = "/api/n8n/webhook";
-const PROD_BASE = "https://n8n.lueratech.com/webhook";
+const PROD_BASE = "https://n8n.vps.lueratech.com/webhook";
 
 const getN8nUrl = (endpoint: string) => {
     const baseUrl = import.meta.env.DEV ? PROXY_BASE : PROD_BASE;
@@ -46,21 +46,68 @@ export const n8nEvolutionService = {
         }
     },
 
-    async generateMessage(companyName: string, companyCategory: string = ""): Promise<string> {
+    async generateMessage(
+        companyNameOrLead: string | {
+            id?: string; name: string; company?: string; phone?: string;
+            website?: string; instagram?: string; facebook?: string;
+            address?: string; rating?: string | number; apolloSector?: string;
+            email?: string; score?: number; tags?: string[];
+        },
+        companyCategory: string = "",
+        senderBusiness?: {
+            senderName?: string | null;
+            businessName?: string | null;
+            businessSector?: string | null;
+            businessOffer?: string | null;
+            businessWebsite?: string | null;
+            businessInstagram?: string | null;
+        }
+    ): Promise<string> {
+        // Accept both old string signature and new full-lead object signature
+        const isLead = typeof companyNameOrLead === 'object';
+        const lead = isLead ? companyNameOrLead : null;
+
+        const payload = isLead ? {
+            // Hedef lead bilgileri
+            companyName:     lead!.name,
+            companyCategory: lead!.company || "",
+            website:         lead!.website || "",
+            instagram:       lead!.instagram || "",
+            facebook:        lead!.facebook || "",
+            address:         lead!.address || "",
+            rating:          lead!.rating ?? "",
+            sector:          lead!.apolloSector || lead!.company || "",
+            email:           lead!.email || "",
+            score:           lead!.score ?? "",
+            tags:            (lead!.tags || []).join(", "),
+            phone:           lead!.phone || "",
+            // 🏢 Gönderen işletme bilgileri — kişiselleştirme için
+            senderName:       senderBusiness?.senderName || "",
+            businessName:     senderBusiness?.businessName || "",
+            businessSector:   senderBusiness?.businessSector || "",
+            businessOffer:    senderBusiness?.businessOffer || "",
+            businessWebsite:  senderBusiness?.businessWebsite || "",
+            businessInstagram:senderBusiness?.businessInstagram || "",
+        } : {
+            companyName: companyNameOrLead as string,
+            companyCategory,
+        };
+
         try {
             const response = await fetch(getN8nUrl(import.meta.env.VITE_N8N_AI_WEBHOOK || "whatsapp-ai-preview"), {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ companyName, companyCategory })
+                body: JSON.stringify(payload)
             });
 
             if (!response.ok) throw new Error("AI generation failed");
 
             const data = await response.json();
-            return data.message || "Mesaj oluşturulamadı.";
+            return data.message || data.text || data.output || "Mesaj oluşturulamadı.";
         } catch (error) {
             console.error("AI Generation Error:", error);
-            return `Merhaba ${companyName}! Sizinle görüşmek isteriz.`;
+            const name = isLead ? (companyNameOrLead as any).name : companyNameOrLead as string;
+            return `Merhaba ${name}! Sizinle görüşmek isteriz.`;
         }
     },
 

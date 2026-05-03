@@ -1,11 +1,19 @@
 import { createContext, useContext, useState, useEffect, useRef, ReactNode, useCallback } from 'react';
 import { Lead, MessageQueueItem } from '@/types/whatsapp';
 import { n8nEvolutionService } from '@/services/n8nEvolutionService';
+import { evolutionService } from '@/services/evolutionService';
 import { supabase } from '@/lib/supabase';
 import { useSentHistory } from '@/hooks/useSentHistory';
 import { usePhoneCooldown } from '@/hooks/usePhoneCooldown';
 import { useAuth } from '@/contexts/AuthContext';
 import { getUserInstanceName } from '@/services/n8nEvolutionService';
+import { useWarmup, WarmupPhase } from '@/hooks/useWarmup';
+import { useUserSettings } from '@/hooks/useUserSettings';
+
+// Sabit max limit (warm-up tamamlandığında ulaşılan)
+export const DAILY_SEND_LIMIT = 80;
+// Ortalama gecikme (35-120s random → ~77s ortalama)
+export const AVG_DELAY_SECONDS = 77;
 
 interface SentRecord {
     leadId: string;
@@ -27,6 +35,13 @@ interface WhatsAppContextType {
     setBulkSendStatus: React.Dispatch<React.SetStateAction<"idle" | "sending" | "completed">>;
     handleSendQueue: () => Promise<void>;
     handleAddToQueue: (leadsToAdd: Lead[]) => void;
+    // Günlük limit + warm-up
+    todaySentCount: number;
+    remainingToday: number;
+    dailyLimitReached: boolean;
+    warmup: WarmupPhase;
+    resetWarmup: () => void;
+    setWarmupStartDate: (date: string) => void;
     // Phone Cooldown
     isPhoneInCooldown: (phone: string) => boolean;
     getPhoneCooldownInfo: (phone: string) => any;
@@ -43,6 +58,20 @@ export const WhatsAppProvider = ({ children }: { children: ReactNode }) => {
     const [isSending, setIsSending] = useState(false);
     const [bulkSendStatus, setBulkSendStatus] = useState<"idle" | "sending" | "completed">("idle");
     const [lastCompletionTime, setLastCompletionTime] = useState<Date | null>(null);
+    const { settings: userSettings } = useUserSettings();
+    // Warm-up için kullanıcının kendi instance adı — multi-tenant uyumlu
+    const instanceName = userSettings.evolution_instance_name || import.meta.env.VITE_EVOLUTION_INSTANCE_NAME || 'testwp';
+    const { warmup, resetWarmup, setStartDate: setWarmupStartDate } = useWarmup(instanceName);
+
+    // İşletme bilgileri — mesaj kişiselleştirme için
+    const senderBusiness = {
+        senderName:        userSettings.sender_name,
+        businessName:      userSettings.business_name,
+        businessSector:    userSettings.business_sector,
+        businessOffer:     userSettings.business_offer,
+        businessWebsite:   userSettings.business_website,
+        businessInstagram: userSettings.business_instagram,
+    };
     const { markAsSent, sentLeadIds, sentRecords, wasSent, getSentFromList } = useSentHistory(user?.id);
     const {
         isInCooldown: isPhoneInCooldown,
@@ -119,41 +148,92 @@ export const WhatsAppProvider = ({ children }: { children: ReactNode }) => {
         }
     }, [messageQueue, bulkSendStatus]);
 
+    // Günlük limit — warm-up fazına göre dinamik
+    const today = new Date().toISOString().split('T')[0];
+    const todaySentCount = sentRecords.filter(r => r.sentAt.startsWith(today)).length;
+    const effectiveDailyLimit = warmup.dailyLimit; // faza göre 10/25/40/60/80
+    const remainingToday = Math.max(0, effectiveDailyLimit - todaySentCount);
+    const dailyLimitReached = todaySentCount >= effectiveDailyLimit;
+
     const handleSendQueue = async () => {
         setIsSending(true);
+        setBulkSendStatus('sending');
+
         const pendingItems = messageQueue.filter(item => item.status === 'pending');
 
         if (pendingItems.length === 0) {
             setIsSending(false);
+            setBulkSendStatus('idle');
             return;
         }
 
-        try {
-            setMessageQueue(prev => prev.map(msg => msg.status === 'pending' ? { ...msg, status: 'sending' } : msg));
-            setBulkSendStatus('sending');
+        // 🛡️ Günlük limit — warm-up fazına göre kırp
+        const allowedItems = pendingItems.slice(0, remainingToday);
+        if (allowedItems.length === 0) {
+            console.warn(`[Anti-ban] Günlük limit (${effectiveDailyLimit} — Faz ${warmup.phase}) doldu.`);
+            setIsSending(false);
+            setBulkSendStatus('idle');
+            return;
+        }
 
-            const instanceName = user ? await getUserInstanceName(user.id) : (import.meta.env.VITE_EVOLUTION_INSTANCE_NAME || 'testwp');
-            const result = await n8nEvolutionService.sendBulkMessages(pendingItems, instanceName);
+        // Limit aşan itemları failed yap
+        if (allowedItems.length < pendingItems.length) {
+            const blockedIds = new Set(pendingItems.slice(allowedItems.length).map(i => i.id));
+            setMessageQueue(prev => prev.map(msg =>
+                blockedIds.has(msg.id)
+                    ? { ...msg, status: 'failed' as const, error: `Faz ${warmup.phase} günlük limiti (${effectiveDailyLimit}) aşıldı` }
+                    : msg
+            ));
+        }
+
+        // Kullanıcının WhatsApp instance adını al
+        const evInstanceName = user
+            ? await getUserInstanceName(user.id)
+            : (import.meta.env.VITE_EVOLUTION_INSTANCE_NAME || 'testwp');
+
+        // ── Her mesajı sırayla, anti-spam delay ile gönder ──────────────────
+        for (let i = 0; i < allowedItems.length; i++) {
+            const item = allowedItems[i];
+
+            // Gönderiliyor durumuna al
+            setMessageQueue(prev => prev.map(msg =>
+                msg.id === item.id ? { ...msg, status: 'sending' as const } : msg
+            ));
+
+            // Evolution API'ye gönder
+            const result = await evolutionService.sendTextMessage(
+                evInstanceName,
+                item.lead.phone,
+                item.message
+            );
 
             if (result.success) {
-                setMessageQueue(prev => prev.map(msg => msg.status === 'sending' ? { ...msg, status: 'sent' } : msg));
-                await markAsSent(pendingItems.map(item => ({ id: item.lead.id, name: item.lead.name })));
-
-                // 🔒 Telefon numaralarını cooldown'a ekle
-                await addToCooldown(
-                    pendingItems
-                        .filter(item => item.lead.phone)
-                        .map(item => ({ phone: item.lead.phone, leadName: item.lead.name }))
-                );
+                setMessageQueue(prev => prev.map(msg =>
+                    msg.id === item.id ? { ...msg, status: 'sent' as const } : msg
+                ));
+                await markAsSent([{ id: item.lead.id, name: item.lead.name }]);
+                if (item.lead.phone) {
+                    await addToCooldown([{ phone: item.lead.phone, leadName: item.lead.name }]);
+                }
             } else {
-                throw new Error("Bulk send failed");
+                setMessageQueue(prev => prev.map(msg =>
+                    msg.id === item.id
+                        ? { ...msg, status: 'failed' as const, error: result.error || 'Gönderilemedi' }
+                        : msg
+                ));
             }
-        } catch (error) {
-            console.error("Queue send error:", error);
-            setMessageQueue(prev => prev.map(msg => msg.status === 'sending' ? { ...msg, status: 'failed' } : msg));
-        } finally {
-            setIsSending(false);
+
+            // 🕐 Anti-spam delay: son mesaj değilse bekle (10–85 saniye arası random)
+            if (i < allowedItems.length - 1) {
+                const delay = Math.floor(Math.random() * (85000 - 10000 + 1)) + 10000;
+                console.log(`[Anti-spam] ${item.lead.name} gönderildi → ${Math.round(delay / 1000)}sn bekleniyor...`);
+                await new Promise(res => setTimeout(res, delay));
+            }
         }
+
+        setIsSending(false);
+        setBulkSendStatus('completed');
+        setTimeout(() => setBulkSendStatus('idle'), 5000);
     };
 
     const handleAddToQueue = (newLeads: Lead[]) => {
@@ -169,7 +249,7 @@ export const WhatsAppProvider = ({ children }: { children: ReactNode }) => {
         setMessageQueue(prev => [...prev, ...newQueue]);
 
         for (const item of newQueue) {
-            n8nEvolutionService.generateMessage(item.lead.name, item.lead.company || '')
+            n8nEvolutionService.generateMessage(item.lead, "", senderBusiness)
                 .then(message => {
                     setMessageQueue(prev => prev.map(q =>
                         q.id === item.id ? { ...q, message, status: "pending" as const } : q
@@ -200,6 +280,13 @@ export const WhatsAppProvider = ({ children }: { children: ReactNode }) => {
             setBulkSendStatus,
             handleSendQueue,
             handleAddToQueue,
+            // Günlük limit + warm-up
+            todaySentCount,
+            remainingToday,
+            dailyLimitReached,
+            warmup,
+            resetWarmup,
+            setWarmupStartDate,
             // Phone Cooldown
             isPhoneInCooldown,
             getPhoneCooldownInfo,

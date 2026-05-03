@@ -17,8 +17,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { n8nEvolutionService } from "@/services/n8nEvolutionService";
 import { useLeads } from "@/hooks/useLeads";
-import { useQRCode } from "@/hooks/useQRCode";
 import { useUserSettings } from "@/hooks/useUserSettings";
+import { useEvolutionConnection } from "@/hooks/useEvolutionConnection";
 import { useWhatsApp } from "@/contexts/WhatsAppContext";
 import { cn } from "@/utils/cn";
 import { Badge } from "@/components/ui/badge";
@@ -33,8 +33,6 @@ import { LeadSelector } from "@/components/whatsapp/LeadSelector";
 import { MessageQueue } from "@/components/whatsapp/MessageQueue";
 
 const WhatsAppPage = () => {
-    // UI State
-    const [connectionStatus, setConnectionStatus] = useState<"connected" | "disconnected" | "connecting">("disconnected");
     const [selectedLeads, setSelectedLeads] = useState<Lead[]>([]);
     const {
         messageQueue,
@@ -49,6 +47,10 @@ const WhatsAppPage = () => {
         getSentFromList,
         isPhoneInCooldown,
         getPhoneRemainingTime,
+        todaySentCount,
+        remainingToday,
+        dailyLimitReached,
+        warmup,
     } = useWhatsApp();
     const [previewMessage, setPreviewMessage] = useState<string>("");
     const [previewLead, setPreviewLead] = useState<Lead | null>(null);
@@ -63,39 +65,26 @@ const WhatsAppPage = () => {
 
     const { settings: userSettings } = useUserSettings();
     const INSTANCE_NAME = userSettings.evolution_instance_name || import.meta.env.VITE_EVOLUTION_INSTANCE_NAME || 'testwp';
-    const { qrCode, clearQRCode, requestNewQR } = useQRCode(INSTANCE_NAME);
+    const {
+        connectionState,
+        isConnected,
+        qrCode,
+        isLoading: isConnectionLoading,
+        connect: connectEvolution,
+        disconnect: disconnectEvolution,
+    } = useEvolutionConnection(INSTANCE_NAME);
 
-    // Bugün gönderilen sayısı ve başarı oranı hesapla
-    const today = new Date().toISOString().split('T')[0];
-    const todaySentCount = sentRecords.filter(r => r.sentAt.startsWith(today)).length;
+    // connectionStatus — hook'tan türetiliyor
+    const connectionStatus = isConnected ? "connected" : connectionState === "connecting" ? "connecting" : "disconnected";
+
+    // Başarı oranı hesapla
     const totalSentCount = sentRecords.length;
     const totalSuccessRate = totalSentCount > 0 ? 100 : 0; // Şimdilik tüm gönderilenler başarılı
 
-    // Automatically close modal when connected
+    // Modal'ı bağlantı kurulunca otomatik kapat
     useEffect(() => {
-        if (connectionStatus === "connected") {
-            setIsQRModalOpen(false);
-        }
-    }, [connectionStatus]);
-
-    // 75-Second QR Code Timeout Logic
-    useEffect(() => {
-        let timeoutId: NodeJS.Timeout;
-
-        if (qrCode && connectionStatus === "connecting") {
-            // When QR code is displayed to the user, start a 75-second timer
-            timeoutId = setTimeout(() => {
-                console.log("[WhatsAppPage] QR code expired after 75 seconds. Resetting UI.");
-                clearQRCode();
-                // Reset connection status so the user can generate a new one
-                setConnectionStatus("disconnected");
-            }, 75000); // 75 seconds
-        }
-
-        return () => {
-            if (timeoutId) clearTimeout(timeoutId);
-        };
-    }, [qrCode, connectionStatus, clearQRCode]);
+        if (isConnected) setIsQRModalOpen(false);
+    }, [isConnected]);
 
     // Load selected leads from local storage on mount
     useEffect(() => {
@@ -113,21 +102,11 @@ const WhatsAppPage = () => {
     const { leads: realLeads } = useLeads();
 
     // Action: Start Connection Process
-    const handleConnect = async () => {
+    const handleConnect = () => {
         setIsQRModalOpen(true);
-
-        if (qrCode) {
-            return;
-        }
-
-        setConnectionStatus("connecting");
-        requestNewQR(); // Clear old QR and accept any new one from Supabase
-
-        try {
-            await n8nEvolutionService.startSession(INSTANCE_NAME);
-        } catch (error) {
-            console.error("Connection failed:", error);
-            setConnectionStatus("disconnected");
+        // Bağlı değilse ve QR yoksa bağlan
+        if (!isConnected && !qrCode) {
+            connectEvolution();
         }
     };
 
@@ -157,7 +136,7 @@ const WhatsAppPage = () => {
         setPreviewMessage("Yapay zeka şirketi analiz edip özel teklif mesajı hazırlıyor... 🤖");
 
         try {
-            const message = await n8nEvolutionService.generateMessage(lead.name, lead.company || '');
+            const message = await n8nEvolutionService.generateMessage(lead);
             setPreviewMessage(message);
         } catch (error) {
             console.error("AI Error:", error);
@@ -258,7 +237,7 @@ const WhatsAppPage = () => {
         ));
 
         try {
-            const message = await n8nEvolutionService.generateMessage(item.lead.name, item.lead.company || '');
+            const message = await n8nEvolutionService.generateMessage(item.lead);
             setMessageQueue(prev => prev.map(q =>
                 q.id === id ? { ...q, message, status: "pending" as const } : q
             ));
@@ -356,10 +335,10 @@ const WhatsAppPage = () => {
                         connectionStatus={connectionStatus}
                         qrCode={qrCode}
                         isQRModalOpen={isQRModalOpen}
+                        isLoading={isConnectionLoading}
                         onConnect={handleConnect}
-                        onOpenChange={(open) => {
-                            setIsQRModalOpen(open);
-                        }}
+                        onDisconnect={disconnectEvolution}
+                        onOpenChange={(open) => setIsQRModalOpen(open)}
                     />
                 </div>
             </header>
@@ -623,6 +602,9 @@ const WhatsAppPage = () => {
                         queue={messageQueue}
                         isSending={isSending}
                         todaySentCount={todaySentCount}
+                        remainingToday={remainingToday}
+                        dailyLimitReached={dailyLimitReached}
+                        warmup={warmup}
                         totalSuccessRate={totalSuccessRate}
                         activePreviewId={previewQueueItemId}
                         onClearQueue={handleClearQueue}

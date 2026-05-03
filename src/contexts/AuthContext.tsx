@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
 import { User as SupabaseUser } from '@supabase/supabase-js';
+import { evolutionService } from '@/services/evolutionService';
 
 interface User {
     id: string;
@@ -30,37 +31,11 @@ const mapSupabaseUser = (supabaseUser: SupabaseUser | null): User | null => {
     };
 };
 
-// Yeni kullanıcı için Evolution API'de instance oluştur
-const createEvolutionInstance = async (userId: string) => {
-    const evolutionUrl = import.meta.env.VITE_EVOLUTION_API_URL;
-    const evolutionKey = import.meta.env.VITE_EVOLUTION_API_KEY;
-
-    if (!evolutionUrl || !evolutionKey) return null;
-
-    const instanceName = `user_${userId.replace(/-/g, '').substring(0, 16)}`;
-
-    try {
-        const response = await fetch(`${evolutionUrl}/instance/create`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'apikey': evolutionKey,
-            },
-            body: JSON.stringify({
-                instanceName,
-                token: instanceName,
-                qrcode: true,
-            }),
-        });
-
-        if (response.ok) {
-            return instanceName;
-        }
-    } catch (err) {
-        console.error('Evolution instance oluşturulamadı:', err);
-    }
-
-    return instanceName; // Hata olsa bile instance adını kaydet
+// Yeni kullanıcı için Evolution API'de instance oluştur ve adını döndür
+const provisionEvolutionInstance = async (userId: string): Promise<string> => {
+    const instanceName = evolutionService.generateInstanceName(userId);
+    await evolutionService.createInstance(instanceName);
+    return instanceName;
 };
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -91,6 +66,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
 
             setUser(mapSupabaseUser(data.user));
+
+            // Mevcut kullanıcının instance'ı yoksa oluştur (background, login'i bloklamaz)
+            if (data.user) {
+                supabase
+                    .from('user_settings')
+                    .select('evolution_instance_name')
+                    .eq('user_id', data.user.id)
+                    .single()
+                    .then(async ({ data: settings }) => {
+                        if (!settings?.evolution_instance_name) {
+                            const instanceName = await provisionEvolutionInstance(data.user!.id);
+                            await supabase.from('user_settings').upsert(
+                                { user_id: data.user!.id, evolution_instance_name: instanceName },
+                                { onConflict: 'user_id' }
+                            );
+                        }
+                    });
+            }
+
             return { success: true };
         } catch (err) {
             console.error('Unexpected Login Error:', err);
@@ -112,7 +106,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
             // Kullanıcı oluşturulduysa Evolution instance aç ve user_settings kaydet
             if (data.user) {
-                const instanceName = await createEvolutionInstance(data.user.id);
+                const instanceName = await provisionEvolutionInstance(data.user.id);
 
                 await supabase.from('user_settings').upsert({
                     user_id: data.user.id,

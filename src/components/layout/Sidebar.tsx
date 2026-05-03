@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Home, Users, BarChart2, Settings, CalendarClock, ChevronLeft, ChevronRight, MessageSquare, LogOut, User, ChevronUp, ArrowUpRight } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { useAuth } from '@/contexts/AuthContext';
 import { NotificationDropdown } from './NotificationDropdown';
+import { supabase } from '@/lib/supabase';
 
 interface SidebarProps {
     activeTab: string;
@@ -16,6 +17,20 @@ export const Sidebar = ({ activeTab, onTabChange, isCollapsed, onCollapsedChange
     const { user, logout } = useAuth();
     const navigate = useNavigate();
     const [showUserMenu, setShowUserMenu] = useState(false);
+    const [callflowConnected, setCallflowConnected] = useState(false);
+
+    // Supabase'den callflow_api_key varlığını kontrol et
+    useEffect(() => {
+        if (!user?.id) return;
+        supabase
+            .from('user_settings')
+            .select('callflow_api_key')
+            .eq('user_id', user.id)
+            .single()
+            .then(({ data }) => {
+                setCallflowConnected(!!data?.callflow_api_key);
+            });
+    }, [user?.id]);
 
     const menuItems = [
         { id: 'dashboard', label: 'Dashboard', icon: Home },
@@ -115,29 +130,31 @@ export const Sidebar = ({ activeTab, onTabChange, isCollapsed, onCollapsedChange
                 </div>
             </nav>
 
-            {/* CallFlow Butonu */}
-            <div className={cn("px-3 pb-2", isCollapsed && "flex justify-center")}>
-                <a
-                    href="https://callflow.lueratech.com"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={cn(
-                        "flex items-center gap-2 px-3 py-2 rounded-xl",
-                        "bg-gray-100 hover:bg-gray-200 transition-all duration-200 group",
-                        isCollapsed && "justify-center"
-                    )}
-                >
-                    <div className={cn("flex items-baseline gap-2 flex-1", isCollapsed && "flex-none")}>
-                        <span className="text-2xl font-bold text-gray-900">LUERA</span>
-                        {!isCollapsed && (
-                            <span className="text-sm font-medium text-gray-400 group-hover:text-gray-600 transition-colors">CallFlow</span>
+            {/* CallFlow Butonu — sadece bağlıysa göster */}
+            {callflowConnected && (
+                <div className={cn("px-3 pb-2", isCollapsed && "flex justify-center")}>
+                    <a
+                        href="https://callflow.lueratech.com"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={cn(
+                            "flex items-center gap-2 px-3 py-2 rounded-xl",
+                            "bg-gray-100 hover:bg-gray-200 transition-all duration-200 group",
+                            isCollapsed && "justify-center"
                         )}
-                    </div>
-                    {!isCollapsed && (
-                        <ArrowUpRight className="w-3.5 h-3.5 text-gray-300 group-hover:text-gray-500 transition-colors flex-shrink-0" />
-                    )}
-                </a>
-            </div>
+                    >
+                        <div className={cn("flex items-baseline gap-2 flex-1", isCollapsed && "flex-none")}>
+                            <span className="text-2xl font-bold text-gray-900">LUERA</span>
+                            {!isCollapsed && (
+                                <span className="text-sm font-medium text-gray-400 group-hover:text-gray-600 transition-colors">CallFlow</span>
+                            )}
+                        </div>
+                        {!isCollapsed && (
+                            <ArrowUpRight className="w-3.5 h-3.5 text-gray-300 group-hover:text-gray-500 transition-colors flex-shrink-0" />
+                        )}
+                    </a>
+                </div>
+            )}
 
             {/* User Profile */}
             <div className="w-full p-4 border-t border-gray-100 bg-white/50 flex-shrink-0">

@@ -1,13 +1,18 @@
-import { Trash2, Clock, CheckCircle2, Play, Loader2, RefreshCw, Send, Zap, TrendingUp } from "lucide-react";
+import { Trash2, Clock, CheckCircle2, Play, Loader2, RefreshCw, Send, Zap, TrendingUp, Shield, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { MessageQueueItem } from "@/types/whatsapp";
 import { cn } from "@/utils/cn";
+import { DAILY_SEND_LIMIT, AVG_DELAY_SECONDS } from "@/contexts/WhatsAppContext";
+import { WarmupPhase } from "@/hooks/useWarmup";
 
 interface MessageQueueProps {
     queue: MessageQueueItem[];
     isSending: boolean;
     todaySentCount: number;
+    remainingToday: number;
+    dailyLimitReached: boolean;
+    warmup: WarmupPhase;
     totalSuccessRate: number;
     activePreviewId: string | null;
     onClearQueue: () => void;
@@ -21,6 +26,9 @@ export const MessageQueue = ({
     queue,
     isSending,
     todaySentCount,
+    remainingToday,
+    dailyLimitReached,
+    warmup,
     totalSuccessRate,
     activePreviewId,
     onClearQueue,
@@ -34,10 +42,20 @@ export const MessageQueue = ({
     const sentCount = queue.filter(m => m.status === 'sent').length;
     const failedCount = queue.filter(m => m.status === 'failed').length;
 
+    // Tahmini gönderim süresi
+    const effectivePending = Math.min(pendingCount, remainingToday);
+    const estimatedSeconds = effectivePending * AVG_DELAY_SECONDS;
+    const estimatedMin = Math.ceil(estimatedSeconds / 60);
+
+    // Günlük limit progress — warm-up fazına göre
+    const dailyProgress = Math.min(100, (todaySentCount / warmup.dailyLimit) * 100);
+    const isNearLimit = todaySentCount >= warmup.dailyLimit * 0.8;
+
     return (
         <div className="col-span-12 lg:col-span-4 bg-white border-l border-slate-100 flex flex-col min-h-0">
-            <div className="p-6 border-b border-slate-50 bg-white z-10">
-                <div className="flex items-center justify-between mb-2">
+            <div className="p-5 border-b border-slate-50 bg-white z-10 space-y-3">
+                {/* Başlık */}
+                <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-[#CCFF00]" />
                         <h2 className="font-bold text-slate-900">Gönderim Kuyruğu</h2>
@@ -52,7 +70,52 @@ export const MessageQueue = ({
                         <Trash2 className="w-4 h-4" />
                     </Button>
                 </div>
-                <div className="flex gap-2 text-xs font-medium text-slate-500">
+
+                {/* 🛡️ Anti-ban koruması — warm-up faz göstergesi */}
+                <div className={cn("rounded-xl p-3 space-y-2", warmup.bgColor)}>
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                            <Shield className={cn("w-3.5 h-3.5", warmup.color)} />
+                            <span className={cn("text-[11px] font-bold", warmup.color)}>
+                                Faz {warmup.phase} — {warmup.label}
+                            </span>
+                        </div>
+                        <span className={cn(
+                            "text-[11px] font-bold",
+                            dailyLimitReached ? "text-red-500" : isNearLimit ? "text-orange-500" : "text-slate-600"
+                        )}>
+                            {todaySentCount} / {warmup.dailyLimit}
+                        </span>
+                    </div>
+                    <div className="w-full h-1.5 bg-white/60 rounded-full overflow-hidden">
+                        <div
+                            className={cn(
+                                "h-full rounded-full transition-all duration-500",
+                                dailyLimitReached ? "bg-red-500" : isNearLimit ? "bg-orange-400" : "bg-current"
+                            )}
+                            style={{ width: `${dailyProgress}%`, backgroundColor: dailyLimitReached ? undefined : isNearLimit ? undefined : 'currentColor' }}
+                        />
+                    </div>
+                    <div className="flex items-center justify-between text-[10px] text-slate-500">
+                        <span>
+                            {dailyLimitReached
+                                ? "⛔ Bugünkü limit doldu"
+                                : warmup.daysUntilNext
+                                    ? `${warmup.daysUntilNext} gün sonra Faz ${warmup.phase + 1} (${warmup.nextLimit}/gün)`
+                                    : `${remainingToday} mesaj kaldı`
+                            }
+                        </span>
+                        {effectivePending > 0 && !dailyLimitReached && (
+                            <span className="flex items-center gap-1 font-medium">
+                                <Clock className="w-3 h-3" />
+                                ~{estimatedMin} dk
+                            </span>
+                        )}
+                    </div>
+                </div>
+
+                {/* Badge'ler */}
+                <div className="flex gap-2 text-xs font-medium text-slate-500 flex-wrap">
                     <Badge variant="secondary" className="bg-slate-100 text-slate-600 border-0">{queue.length} Toplam</Badge>
                     {generatingCount > 0 && (
                         <Badge variant="secondary" className="bg-purple-50 text-purple-600 border-0 animate-pulse">{generatingCount} Oluşturuluyor</Badge>
@@ -65,6 +128,20 @@ export const MessageQueue = ({
                         <Badge variant="secondary" className="bg-red-50 text-red-600 border-0">{failedCount} Hata</Badge>
                     )}
                 </div>
+
+                {/* Limit uyarısı */}
+                {dailyLimitReached && (
+                    <div className="flex items-center gap-2 bg-red-50 border border-red-100 rounded-xl px-3 py-2.5">
+                        <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />
+                        <p className="text-xs text-red-600 font-medium">Günlük limit doldu. Yarın tekrar gönderin.</p>
+                    </div>
+                )}
+                {isNearLimit && !dailyLimitReached && (
+                    <div className="flex items-center gap-2 bg-orange-50 border border-orange-100 rounded-xl px-3 py-2.5">
+                        <AlertTriangle className="w-4 h-4 text-orange-500 shrink-0" />
+                        <p className="text-xs text-orange-600 font-medium">Limite yaklaşıyorsunuz ({remainingToday} kaldı).</p>
+                    </div>
+                )}
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/30 custom-scrollbar">

@@ -3,6 +3,16 @@ export interface Lead {
     name: string;
     company: string;
     phone: string;
+    // Extended fields for AI personalization
+    website?: string;
+    instagram?: string;
+    facebook?: string;
+    address?: string;
+    rating?: string | number;
+    apolloSector?: string;
+    email?: string;
+    score?: number;
+    tags?: string[];
 }
 
 export interface MessageQueueItem {

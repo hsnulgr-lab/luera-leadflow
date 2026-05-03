@@ -1,0 +1,73 @@
+{
+  "name": "Lead — Scrape Contact Page",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lead-scrape-contact",
+        "responseMode": "responseNode",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              { "name": "Access-Control-Allow-Origin", "value": "*" },
+              { "name": "Content-Type", "value": "application/json" }
+            ]
+          }
+        }
+      },
+      "id": "node-0001",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [-300, 200],
+      "webhookId": "lead-scrape-contact"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ─────────────────────────────────────────────────────────────────\n// Tek node'da tüm işlem:\n//   1. URL normalize (http→https, protokol ekleme, /iletisim path)\n//   2. HTTPS dene (8sn timeout)\n//   3. Başarısız olursa HTTP dene\n//   4. HTML'den telefon & email çıkar\n//   5. Her durumda sonuç döndür — hata fırlatma\n// ─────────────────────────────────────────────────────────────────\n\nconst input = $input.first().json;\n\n// Boş sonuç şablonu\nconst emptyResult = (reason) => ({\n  ...input,\n  scraped: false,\n  scrapedPhone: null,\n  scrapedEmail: null,\n  allPhones: [],\n  allEmails: [],\n  scrapeError: reason,\n});\n\n// 1. URL normalize\nconst raw = (input.website || input.Website || '').trim();\nif (!raw) return [{ json: emptyResult('Website alanı boş') }];\n\nlet base = raw.replace(/\\/+$/, '');\nif (!base.startsWith('http://') && !base.startsWith('https://')) {\n  base = 'https://' + base;\n}\n// HTTPS öncelikli\nconst httpsBase = base.replace(/^http:\\/\\//, 'https://');\nconst httpBase  = httpsBase.replace(/^https:\\/\\//, 'http://');\n\n// Domain kontrolü\ntry {\n  const parsed = new URL(httpsBase);\n  if (!parsed.hostname.includes('.') || parsed.hostname.length < 4) {\n    return [{ json: emptyResult('Geçersiz domain: ' + parsed.hostname) }];\n  }\n} catch {\n  return [{ json: emptyResult('URL parse hatası') }];\n}\n\nconst urlHttps = httpsBase + '/iletisim';\nconst urlHttp  = httpBase  + '/iletisim';\n\n// 2. HTTP request helper\nasync function fetchPage(url) {\n  try {\n    const res = await $helpers.httpRequest({\n      url,\n      method: 'GET',\n      returnFullResponse: false,\n      ignoreHttpStatusErrors: true,\n      options: {\n        timeout: 8000,\n        followRedirect: true,\n        maxRedirects: 5,\n      },\n    });\n    // res string veya object olabilir\n    return typeof res === 'string' ? res : JSON.stringify(res);\n  } catch {\n    return null;\n  }\n}\n\n// 3. HTTPS dene → başarısız olursa HTTP\nlet html = await fetchPage(urlHttps);\nlet usedUrl = urlHttps;\nif (!html || html.length < 100) {\n  html = await fetchPage(urlHttp);\n  usedUrl = urlHttp;\n}\n\nif (!html || html.length < 50) {\n  return [{ json: emptyResult('Siteye bağlanılamadı: ' + urlHttps) }];\n}\n\n// 4. İletişim bilgilerini çıkar\nfunction extractContacts(h) {\n  const phones = new Set();\n  // Türkiye: 05XX, +905XX, 905XX, sabit hat\n  const phoneRx = [\n    /(\\+90[\\s\\-]?5\\d{2}[\\s\\-]?\\d{3}[\\s\\-]?\\d{2}[\\s\\-]?\\d{2})/g,\n    /(0[\\s\\-]?\\(?5\\d{2}\\)?[\\s\\-]?\\d{3}[\\s\\-]?\\d{2}[\\s\\-]?\\d{2})/g,\n    /(\\(?0?[23]\\d{2}\\)?[\\s\\-]?\\d{3}[\\s\\-]?\\d{2}[\\s\\-]?\\d{2})/g,\n  ];\n  for (const rx of phoneRx) {\n    for (const m of h.matchAll(rx)) {\n      const p = m[0].replace(/[\\s\\-\\(\\)]/g, '');\n      if (p.length >= 10 && p.length <= 15) phones.add(p);\n    }\n  }\n\n  const emails = new Set();\n  for (const m of h.matchAll(/[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}/g)) {\n    const e = m[0].toLowerCase();\n    if (!e.match(/\\.(png|jpg|gif|css|js|svg|ico|woff|eot|ttf|map)$/)) emails.add(e);\n  }\n\n  return {\n    scrapedPhone: [...phones][0] || null,\n    scrapedEmail: [...emails][0] || null,\n    allPhones: [...phones].slice(0, 5),\n    allEmails: [...emails].slice(0, 5),\n  };\n}\n\nconst contacts = extractContacts(html);\n\nreturn [{ json: {\n  ...input,\n  scraped: true,\n  scrapedUrl: usedUrl,\n  htmlLength: html.length,\n  scrapeError: null,\n  ...contacts,\n} }];"
+      },
+      "id": "node-0002",
+      "name": "Scrape & Parse",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-60, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              { "name": "Access-Control-Allow-Origin", "value": "*" }
+            ]
+          }
+        }
+      },
+      "id": "node-0003",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [180, 200]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [{ "node": "Scrape & Parse", "type": "main", "index": 0 }]
+      ]
+    },
+    "Scrape & Parse": {
+      "main": [
+        [{ "node": "Respond", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": { "executionOrder": "v1" },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2026-05-03T00:00:00.000Z",
+  "versionId": "lead-scrape-v4"
+}
