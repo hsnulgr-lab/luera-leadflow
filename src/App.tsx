@@ -12,6 +12,7 @@ import MessagesPage from "./pages/MessagesPage";
 import WhatsAppPage from "./pages/WhatsAppPage";
 import { SchedulerPage } from "./pages/SchedulerPage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { ResetPasswordPage } from "./pages/ResetPasswordPage";
 import { Loader2 } from "lucide-react";
 
 import { ErrorBoundary } from "./components/common/ErrorBoundary";
@@ -52,6 +53,7 @@ const App = () => {
                     <ErrorBoundary>
                         <Routes>
                             <Route path="/login" element={<LoginPage />} />
+                            <Route path="/reset-password" element={<ResetPasswordPage />} />
 
                             <Route path="/" element={
                                 <ProtectedRoute>

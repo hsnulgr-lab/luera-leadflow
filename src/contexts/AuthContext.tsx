@@ -16,6 +16,7 @@ interface AuthContextType {
     isLoading: boolean;
     login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
     signup: (email: string, password: string, name: string) => Promise<{ success: boolean; error?: string }>;
+    forgotPassword: (email: string) => Promise<{ success: boolean; error?: string }>;
     logout: () => Promise<void>;
 }
 
@@ -101,24 +102,50 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             });
 
             if (error) {
+                // Yaygın hataları Türkçeye çevir
+                if (error.message.includes('already registered') || error.message.includes('User already exists')) {
+                    return { success: false, error: 'Bu e-posta adresi zaten kayıtlı.' };
+                }
+                if (error.message.includes('Password should be at least')) {
+                    return { success: false, error: 'Şifre en az 6 karakter olmalı.' };
+                }
                 return { success: false, error: error.message };
             }
 
-            // Kullanıcı oluşturulduysa Evolution instance aç ve user_settings kaydet
+            // Kullanıcı oluşturulduysa, arka planda Evolution + user_settings (signup'ı bloklamaz)
             if (data.user) {
-                const instanceName = await provisionEvolutionInstance(data.user.id);
-
-                await supabase.from('user_settings').upsert({
-                    user_id: data.user.id,
-                    n8n_webhook_url: import.meta.env.VITE_N8N_WEBHOOK_URL || null,
-                    gemini_api_key: null,
-                    evolution_instance_name: instanceName,
-                }, { onConflict: 'user_id' });
+                const userId = data.user.id;
+                Promise.resolve().then(async () => {
+                    try {
+                        const instanceName = await provisionEvolutionInstance(userId);
+                        await supabase.from('user_settings').upsert({
+                            user_id: userId,
+                            n8n_webhook_url: import.meta.env.VITE_N8N_WEBHOOK_URL || null,
+                            gemini_api_key: null,
+                            evolution_instance_name: instanceName,
+                        }, { onConflict: 'user_id' });
+                    } catch (e) {
+                        console.error('[Signup] Background provisioning failed:', e);
+                        // Sessizce devam et — kullanıcı deneyimini bozmaz
+                    }
+                });
             }
 
             return { success: true };
         } catch (err) {
             return { success: false, error: 'Kayıt olurken bir hata oluştu' };
+        }
+    };
+
+    const forgotPassword = async (email: string): Promise<{ success: boolean; error?: string }> => {
+        try {
+            const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                redirectTo: `${window.location.origin}/reset-password`,
+            });
+            if (error) return { success: false, error: error.message };
+            return { success: true };
+        } catch (err) {
+            return { success: false, error: 'Bir hata oluştu, lütfen tekrar deneyin.' };
         }
     };
 
@@ -128,7 +155,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
 
     return (
-        <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, signup, logout }}>
+        <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, signup, forgotPassword, logout }}>
             {children}
         </AuthContext.Provider>
     );

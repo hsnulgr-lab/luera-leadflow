@@ -7,7 +7,7 @@ import { AIMessageDialog } from "@/components/dashboard/AIMessageDialog";
 import { AIOfferDialog } from "@/components/dashboard/AIOfferDialog";
 import { useLeads } from "@/hooks/useLeads";
 import { ScheduleConfig, Lead } from "@/types/lead";
-import { Users, Target, Send, TrendingUp, CheckCircle2, Loader2, Sparkles, Coffee, Lightbulb, BarChart3, MessageCircle, Zap } from "lucide-react";
+import { Users, Target, Send, TrendingUp, CheckCircle2, Loader2, Sparkles, Coffee, Lightbulb, BarChart3, MessageCircle, Zap, History, CalendarClock, Activity, Search, Mail, Globe } from "lucide-react";
 import { cn } from "@/utils/cn";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -83,6 +83,40 @@ export const DashboardPage = () => {
     const [slide2, setSlide2] = useState(0);
     const [slide3, setSlide3] = useState(0);
 
+    // Elapsed timer for active search
+    const searchStartTime = useRef<Date | null>(null);
+    const [elapsedSeconds, setElapsedSeconds] = useState(0);
+    useEffect(() => {
+        if (isSearching) {
+            if (!searchStartTime.current) searchStartTime.current = new Date();
+            const interval = setInterval(() => {
+                setElapsedSeconds(Math.floor((Date.now() - searchStartTime.current!.getTime()) / 1000));
+            }, 1000);
+            return () => clearInterval(interval);
+        } else {
+            searchStartTime.current = null;
+            setElapsedSeconds(0);
+        }
+    }, [isSearching]);
+
+    // Search history
+    const [searchHistory, setSearchHistory] = useState<Array<{
+        city: string; district: string; sector: string;
+        resultCount: number; timestamp: string;
+    }>>([]);
+
+    useEffect(() => {
+        const load = () => {
+            try {
+                const h = JSON.parse(localStorage.getItem('search_history') || '[]');
+                setSearchHistory(h);
+            } catch (_) {}
+        };
+        load();
+        window.addEventListener('storage', load);
+        return () => window.removeEventListener('storage', load);
+    }, [leads]); // leads değişince de yenile (arama bitince)
+
     // Independent timers — different speeds so they don't feel robotic
     useEffect(() => {
         const t1 = setInterval(() => setSlide1(p => p + 1), 12000);  // 12s
@@ -125,6 +159,15 @@ export const DashboardPage = () => {
                         const leadsWithPhone = leads.filter(l => l.phone && l.phone.length > 3).length;
                         const leadsNoPhone = leads.length - leadsWithPhone;
                         const phoneRate = leads.length > 0 ? Math.round((leadsWithPhone / leads.length) * 100) : 0;
+                        const leadsWithEmail = leads.filter(l => l.email && l.email !== 'N/A' && l.email.includes('@')).length;
+                        const leadsWithWebsite = leads.filter(l => l.website).length;
+                        const todayLeads = leads.filter(l => {
+                            if (!l.dateAdded) return false;
+                            const d = new Date(l.dateAdded);
+                            const now = new Date();
+                            return d.toDateString() === now.toDateString();
+                        }).length;
+
                         const slides = [
                             {
                                 icon: <Coffee className="w-4 h-4 text-[#CCFF00]" />,
@@ -139,36 +182,93 @@ export const DashboardPage = () => {
                                 sub: <><TrendingUp className="w-3 h-3 text-green-500" /><span className="text-xs font-medium text-green-600">{leadsWithPhone} doğrulanmış numara • {leadsNoPhone} eksik</span></>,
                             },
                             {
-                                icon: <Target className="w-4 h-4 text-[#CCFF00]" />,
-                                label: 'İLETİŞİM GÜCÜ',
-                                value: <span className="text-2xl">%{phoneRate}</span>,
-                                sub: <span className="text-xs text-gray-400">Portföyünüzün %{phoneRate}'i WhatsApp gönderimine uygun.</span>,
+                                icon: <History className="w-4 h-4 text-[#CCFF00]" />,
+                                label: 'SON ARAMALAR',
+                                value: <span className="text-xl">{searchHistory.length > 0 ? `${searchHistory.length} arama` : '—'}</span>,
+                                sub: searchHistory.length > 0 ? (
+                                    <div className="flex flex-col gap-0.5 mt-0.5">
+                                        {searchHistory.slice(0, 3).map((h, i) => (
+                                            <div key={i} className="flex items-center gap-1.5">
+                                                <Search className="w-2.5 h-2.5 text-gray-400 shrink-0" />
+                                                <span className="text-[11px] text-gray-500 truncate capitalize">
+                                                    {h.sector} · {h.district || h.city}
+                                                    <span className="text-gray-400"> — {h.resultCount} lead</span>
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : <span className="text-xs text-gray-400">Henüz arama yapılmadı.</span>,
                             },
                             {
-                                icon: <Lightbulb className="w-4 h-4 text-[#CCFF00]" />,
-                                label: 'YAPAY ZEKA',
-                                value: <span className="text-xl">{pendingCount > 0 ? "Aksiyon Gerekli" : sentCount > 0 ? "Görev Tamamlandı" : "Asistan Beklemede"}</span>,
-                                sub: <><Sparkles className="w-3 h-3 text-purple-500 shrink-0 mt-0.5" /><span className="text-xs font-medium text-purple-600 line-clamp-2">{pendingCount > 0 ? `${pendingCount} adet taslak oluşturuldu, gönderim onayı bekliyor.` : sentCount > 0 ? 'Hedef kilitlendi. Ağınızı büyütmek için yeni bir tarama başlatın.' : 'Asistanınız yeni hedef belirlemenizi bekliyor.'}</span></>,
+                                icon: <CalendarClock className="w-4 h-4 text-[#CCFF00]" />,
+                                label: 'BUGÜNÜN ÖZETİ',
+                                value: <span className="text-2xl">{todayLeads}</span>,
+                                sub: <div className="flex items-center gap-3 mt-0.5">
+                                    <span className="flex items-center gap-1 text-[11px] text-gray-500"><Mail className="w-3 h-3 text-blue-400" />{leadsWithEmail} email</span>
+                                    <span className="flex items-center gap-1 text-[11px] text-gray-500"><Globe className="w-3 h-3 text-purple-400" />{leadsWithWebsite} site</span>
+                                    <span className="flex items-center gap-1 text-[11px] text-gray-500"><Send className="w-3 h-3 text-green-400" />{sentCount} mesaj</span>
+                                </div>,
                             },
                         ];
                         const slide = slides[slide1 % slides.length];
+                        const searchActive = isSearching || automationProgress > 0;
                         return (
                             <div className="flex-1 min-w-0 group relative rounded-2xl p-5 bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden">
-                                <div className="absolute top-2.5 right-5 flex gap-1">
-                                    {slides.map((_, i) => (
-                                        <div key={i} className={cn("w-1.5 h-1.5 rounded-full transition-all duration-300", i === slide1 % slides.length ? "bg-slate-900 w-3" : "bg-gray-300")} />
-                                    ))}
-                                </div>
-                                <div className="relative h-[110px]">
-                                    <div key={slide1} className="absolute inset-0 animate-slideUp">
-                                        <div className="flex items-center justify-between mb-3">
-                                            <p className="text-[11px] font-semibold text-gray-400 tracking-wider uppercase truncate pr-4">{slide.label}</p>
-                                            <div className="p-2.5 rounded-xl bg-slate-900 shrink-0">{slide.icon}</div>
-                                        </div>
-                                        <h3 className="text-2xl font-bold text-gray-900 tracking-tight truncate">{slide.value}</h3>
-                                        <div className="mt-2 flex items-start gap-1.5 line-clamp-2 leading-snug break-words whitespace-normal">{slide.sub}</div>
+                                {!searchActive && (
+                                    <div className="absolute top-2.5 right-5 flex gap-1">
+                                        {slides.map((_, i) => (
+                                            <div key={i} className={cn("w-1.5 h-1.5 rounded-full transition-all duration-300", i === slide1 % slides.length ? "bg-slate-900 w-3" : "bg-gray-300")} />
+                                        ))}
                                     </div>
-                                </div>
+                                )}
+                                {searchActive ? (
+                                    <div key="card1-search" className="animate-slideUp">
+                                        <div className="flex items-center justify-between mb-2.5">
+                                            <p className="text-[11px] font-semibold text-gray-400 tracking-wider uppercase">ARAMA AKTİF</p>
+                                            <div className="p-2.5 rounded-xl bg-slate-900 shrink-0">
+                                                <Search className="w-4 h-4 text-[#CCFF00]" />
+                                            </div>
+                                        </div>
+                                        {/* Location + sector */}
+                                        <div className="flex items-center gap-1.5 mb-1">
+                                            <span className="text-sm leading-none">📍</span>
+                                            <span className="text-sm font-bold text-gray-900 capitalize truncate">
+                                                {scheduleConfig.district ? `${scheduleConfig.district} / ${scheduleConfig.city}` : scheduleConfig.city || '—'}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5 mb-2.5">
+                                            <span className="text-sm leading-none">🔍</span>
+                                            <span className="text-sm font-semibold text-gray-700 capitalize truncate">{scheduleConfig.sector || '—'}</span>
+                                        </div>
+                                        {/* Stats mini-cards */}
+                                        <div className="grid grid-cols-2 gap-1.5 mb-2">
+                                            <div className="rounded-lg bg-slate-50 border border-slate-100 px-2.5 py-1.5">
+                                                <div className="text-[9px] text-gray-400 font-semibold tracking-wide mb-0.5">HEDEF</div>
+                                                <div className="text-sm font-bold text-gray-800">🎯 {scheduleConfig.limit}</div>
+                                            </div>
+                                            <div className="rounded-lg bg-slate-50 border border-slate-100 px-2.5 py-1.5">
+                                                <div className="text-[9px] text-gray-400 font-semibold tracking-wide mb-0.5">MEVCUT</div>
+                                                <div className="text-sm font-bold text-gray-800">👤 {leads.length}</div>
+                                            </div>
+                                        </div>
+                                        {/* Status badge full width */}
+                                        {automationProgress >= 100
+                                            ? <div className="text-[11px] text-green-700 font-semibold bg-green-50 border border-green-100 px-2.5 py-1.5 rounded-lg text-center">✅ Tüm veriler başarıyla toplandı</div>
+                                            : <div className="text-[11px] text-amber-600 font-medium bg-amber-50 border border-amber-100 px-2.5 py-1.5 rounded-lg text-center animate-pulse">⏳ Taranıyor, lütfen bekleyin...</div>
+                                        }
+                                    </div>
+                                ) : (
+                                    <div className="relative h-[110px]">
+                                        <div key={slide1} className="absolute inset-0 animate-slideUp">
+                                            <div className="flex items-center justify-between mb-3">
+                                                <p className="text-[11px] font-semibold text-gray-400 tracking-wider uppercase truncate pr-4">{slide.label}</p>
+                                                <div className="p-2.5 rounded-xl bg-slate-900 shrink-0">{slide.icon}</div>
+                                            </div>
+                                            <h3 className="text-2xl font-bold text-gray-900 tracking-tight truncate">{slide.value}</h3>
+                                            <div className="mt-2 flex items-start gap-1.5 line-clamp-2 leading-snug break-words whitespace-normal">{slide.sub}</div>
+                                        </div>
+                                    </div>
+                                )}
                                 <style>{`
                                     @keyframes slideUp { 0% { opacity: 0; transform: translateY(12px); } 100% { opacity: 1; transform: translateY(0); } }
                                     .animate-slideUp { animation: slideUp 0.5s cubic-bezier(0.16,1,0.3,1) forwards; }
@@ -177,24 +277,35 @@ export const DashboardPage = () => {
                         );
                     })()}
 
-                    {/* Aktif Tarama — with integrated automation progress */}
+                    {/* Aktif Tarama — enhanced with radar sweep, elapsed timer, city/sector badges, node steps */}
                     <div
                         className="group relative rounded-2xl bg-slate-900 border border-slate-800 shadow-sm overflow-hidden min-w-0 transition-all duration-[2000ms] ease-out"
                         style={{ flex: (isSearching || automationProgress > 0) ? 2 : 1 }}
                     >
-                        {/* Animated background layers */}
+                        {/* Floating blobs */}
                         <div className="absolute inset-0 overflow-hidden pointer-events-none">
                             <div className="absolute w-32 h-32 rounded-full bg-[#CCFF00]/15 blur-2xl animate-float1" />
                             <div className="absolute w-20 h-20 rounded-full bg-[#CCFF00]/12 blur-xl animate-float2" />
                             <div className="absolute w-16 h-16 rounded-full bg-cyan-400/10 blur-2xl animate-float3" />
                         </div>
 
-                        {/* Layer 3: Subtle grid pattern */}
+                        {/* Grid dots */}
                         <div className="absolute inset-0 pointer-events-none opacity-[0.03]"
                             style={{ backgroundImage: 'radial-gradient(circle, #CCFF00 1px, transparent 1px)', backgroundSize: '24px 24px' }}
                         />
 
-                        {/* Scanning glow effect (active during search) */}
+                        {/* RADAR SWEEP — only during search */}
+                        {isSearching && (
+                            <div className="absolute inset-0 pointer-events-none flex items-center justify-end overflow-hidden">
+                                <div className="absolute w-[380px] h-[380px] rounded-full animate-radar-spin opacity-60"
+                                    style={{ background: 'conic-gradient(from 0deg, transparent 70%, rgba(204,255,0,0.18) 100%)' }}
+                                />
+                                <div className="absolute w-28 h-28 rounded-full border border-[#CCFF00]/15 animate-ring1" />
+                                <div className="absolute w-52 h-52 rounded-full border border-[#CCFF00]/08 animate-ring2" />
+                            </div>
+                        )}
+
+                        {/* Scanning glow */}
                         <div className={cn(
                             "absolute inset-0 bg-gradient-to-r from-[#CCFF00]/0 via-[#CCFF00]/5 to-[#CCFF00]/0 transition-opacity duration-700",
                             isSearching ? "opacity-100 animate-pulse" : "opacity-0"
@@ -212,6 +323,12 @@ export const DashboardPage = () => {
                                         <span className="relative inline-flex rounded-full h-2 w-2 bg-[#CCFF00]" />
                                     </span>
                                     Aktif Tarama
+                                    {/* Elapsed timer */}
+                                    {isSearching && elapsedSeconds > 0 && (
+                                        <span className="font-mono text-[#CCFF00]/50 text-[11px] tracking-widest">
+                                            {String(Math.floor(elapsedSeconds / 60)).padStart(2, '0')}:{String(elapsedSeconds % 60).padStart(2, '0')}
+                                        </span>
+                                    )}
                                 </p>
                                 <div className="flex items-center gap-2">
                                     <span className={cn(
@@ -236,21 +353,30 @@ export const DashboardPage = () => {
                                 </div>
                             </div>
 
-                            {/* Main value */}
+                            {/* Main status + context badges */}
                             <h3 className="text-3xl font-bold text-white tracking-tight transition-all duration-300">
                                 {automationProgress >= 100 ? "Tamamlandı" : isSearching ? "Taranıyor" : "Hazır"}
                             </h3>
 
-                            {/* Subtitle / current step */}
-                            <div className="mt-1.5">
+                            <div className="mt-1.5 flex items-center gap-2 flex-wrap">
                                 {isSearching ? (
-                                    <span className="text-xs font-medium text-[#CCFF00]/60">
-                                        {automationSteps[currentStep]?.label || "İşlem devam ediyor..."}
-                                    </span>
+                                    <>
+                                        <span className="text-xs font-medium text-[#CCFF00]/60">
+                                            {automationSteps[currentStep]?.label || "İşlem devam ediyor..."}
+                                        </span>
+                                        {scheduleConfig.city && (
+                                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#CCFF00]/10 text-[#CCFF00]/70 font-medium capitalize">
+                                                📍 {scheduleConfig.district || scheduleConfig.city}
+                                            </span>
+                                        )}
+                                        {scheduleConfig.sector && (
+                                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/5 text-slate-400 font-medium capitalize border border-slate-700">
+                                                {scheduleConfig.sector}
+                                            </span>
+                                        )}
+                                    </>
                                 ) : automationProgress >= 100 ? (
-                                    <span className="text-xs font-medium text-[#CCFF00]/60">
-                                        Tüm veriler başarıyla toplandı
-                                    </span>
+                                    <span className="text-xs font-medium text-[#CCFF00]/60">Tüm veriler başarıyla toplandı</span>
                                 ) : (
                                     <span className="text-xs font-medium text-slate-400">
                                         {pendingCount > 0 ? `${pendingCount} mesaj sırada` : "Sistem kullanıma hazır"}
@@ -262,41 +388,68 @@ export const DashboardPage = () => {
                             <div
                                 className="overflow-hidden transition-all duration-700 ease-out"
                                 style={{
-                                    maxHeight: (isSearching || automationProgress > 0) ? '120px' : '0px',
+                                    maxHeight: (isSearching || automationProgress > 0) ? '160px' : '0px',
                                     opacity: (isSearching || automationProgress > 0) ? 1 : 0,
                                 }}
                             >
                                 <div className="mt-4">
-                                    <div className="w-full h-1 bg-slate-800 rounded-full overflow-hidden">
+                                    {/* Progress bar — slightly thicker */}
+                                    <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
                                         <div
                                             className="h-full bg-[#CCFF00] rounded-full transition-all duration-700 ease-out relative"
                                             style={{ width: `${automationProgress}%` }}
                                         >
                                             {isSearching && (
-                                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer" />
+                                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent animate-shimmer" />
                                             )}
                                         </div>
                                     </div>
 
-                                    {/* Step indicators */}
-                                    <div className="flex items-center gap-3 mt-3">
+                                    {/* Enhanced step nodes with connecting lines */}
+                                    <div className="flex items-start mt-4">
                                         {automationSteps.map((step, i) => (
-                                            <div key={i} className="flex items-center gap-1.5">
-                                                {step.completed ? (
-                                                    <CheckCircle2 className="w-3 h-3 text-[#CCFF00]" />
-                                                ) : i === currentStep && isSearching ? (
-                                                    <div className="relative w-3 h-3 flex items-center justify-center">
-                                                        <div className="w-1.5 h-1.5 bg-[#CCFF00] rounded-full" />
-                                                        <div className="absolute inset-0 rounded-full border border-[#CCFF00]/40 animate-ping" />
+                                            <div key={i} className="flex flex-col items-center flex-1">
+                                                <div className="flex items-center w-full">
+                                                    {/* Left line */}
+                                                    <div className={cn(
+                                                        "flex-1 h-px transition-all duration-700",
+                                                        i === 0 ? "invisible" :
+                                                        completedSteps[i] ? "bg-[#CCFF00]/50" :
+                                                        i <= currentStep && isSearching ? "bg-[#CCFF00]/30" : "bg-slate-700"
+                                                    )} />
+                                                    {/* Node */}
+                                                    <div className={cn(
+                                                        "relative w-6 h-6 rounded-full flex items-center justify-center border-2 transition-all duration-500 shrink-0",
+                                                        step.completed
+                                                            ? "bg-[#CCFF00] border-[#CCFF00] shadow-[0_0_10px_rgba(204,255,0,0.55)]"
+                                                            : i === currentStep && isSearching
+                                                            ? "bg-transparent border-[#CCFF00] shadow-[0_0_14px_rgba(204,255,0,0.4)]"
+                                                            : "bg-transparent border-slate-700"
+                                                    )}>
+                                                        {step.completed ? (
+                                                            <CheckCircle2 className="w-3.5 h-3.5 text-slate-900" />
+                                                        ) : i === currentStep && isSearching ? (
+                                                            <>
+                                                                <div className="w-2 h-2 bg-[#CCFF00] rounded-full" />
+                                                                <div className="absolute inset-[-3px] rounded-full border-2 border-[#CCFF00]/35 animate-ping" />
+                                                            </>
+                                                        ) : (
+                                                            <span className="text-[9px] font-bold text-slate-500">{i + 1}</span>
+                                                        )}
                                                     </div>
-                                                ) : (
-                                                    <div className="w-3 h-3 rounded-full border border-slate-700 flex items-center justify-center">
-                                                        <div className="w-1 h-1 rounded-full bg-slate-600" />
-                                                    </div>
-                                                )}
+                                                    {/* Right line */}
+                                                    <div className={cn(
+                                                        "flex-1 h-px transition-all duration-700",
+                                                        i === automationSteps.length - 1 ? "invisible" :
+                                                        step.completed ? "bg-[#CCFF00]/50" : "bg-slate-700"
+                                                    )} />
+                                                </div>
+                                                {/* Label below node */}
                                                 <span className={cn(
-                                                    "text-[10px] font-medium hidden md:inline",
-                                                    step.completed ? "text-slate-300" : i === currentStep && isSearching ? "text-white" : "text-slate-600"
+                                                    "text-[9px] font-medium text-center mt-1.5 leading-tight px-0.5",
+                                                    step.completed ? "text-[#CCFF00]/75"
+                                                    : i === currentStep && isSearching ? "text-white"
+                                                    : "text-slate-600"
                                                 )}>
                                                     {step.label}
                                                 </span>
@@ -317,12 +470,29 @@ export const DashboardPage = () => {
                             .animate-float2 { animation: float2 15s ease-in-out infinite; }
                             @keyframes float3 { 0%,100% { bottom: 20%; left: 40%; } 50% { bottom: 60%; left: 10%; } }
                             .animate-float3 { animation: float3 18s ease-in-out infinite; }
+                            @keyframes radar-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+                            .animate-radar-spin { animation: radar-spin 2.5s linear infinite; }
+                            @keyframes ring1 { 0%,100% { transform: scale(1); opacity: 0.5; } 50% { transform: scale(1.6); opacity: 0; } }
+                            .animate-ring1 { animation: ring1 2s ease-in-out infinite; }
+                            @keyframes ring2 { 0%,100% { transform: scale(1); opacity: 0.3; } 50% { transform: scale(1.4); opacity: 0; } }
+                            .animate-ring2 { animation: ring2 2.8s ease-in-out infinite 0.4s; }
                         `}</style>
                     </div>
 
                     {/* CARD 2: Messaging Stats — rotating carousel */}
                     {(() => {
                         const totalMessages = sentCount + pendingCount;
+                        // Aktivite akışı — localStorage'dan son 3 olay
+                        const recentActivity: Array<{icon: React.ReactNode; text: string; time: string}> = [];
+                        if (searchHistory.length > 0) {
+                            const last = searchHistory[0];
+                            const mins = Math.round((Date.now() - new Date(last.timestamp).getTime()) / 60000);
+                            const timeStr = mins < 60 ? `${mins}dk önce` : `${Math.round(mins/60)}sa önce`;
+                            recentActivity.push({ icon: <Search className="w-2.5 h-2.5 text-blue-400" />, text: `${last.sector} · ${last.district || last.city} — ${last.resultCount} lead`, time: timeStr });
+                        }
+                        if (sentCount > 0) recentActivity.push({ icon: <Send className="w-2.5 h-2.5 text-green-400" />, text: `${sentCount} WhatsApp mesajı gönderildi`, time: 'bugün' });
+                        if (leads.length > 0) recentActivity.push({ icon: <Users className="w-2.5 h-2.5 text-purple-400" />, text: `Toplam ${leads.length} lead portföyde`, time: '' });
+
                         const msgSlides = [
                             {
                                 icon: <Send className="w-4 h-4 text-[#CCFF00]" />,
@@ -331,6 +501,22 @@ export const DashboardPage = () => {
                                 sub: sentCount > 0
                                     ? <><CheckCircle2 className="w-3 h-3 text-green-500" /><span className="text-xs font-medium text-green-600">{sentCount} işletmeye başarıyla ulaşıldı.</span></>
                                     : <span className="text-xs font-medium text-gray-400">Henüz bir mesajlaşma başlatılmadı.</span>,
+                            },
+                            {
+                                icon: <Activity className="w-4 h-4 text-[#CCFF00]" />,
+                                label: 'AKTİVİTE AKIŞI',
+                                value: <span className="text-xl">{recentActivity.length > 0 ? 'Son Olaylar' : '—'}</span>,
+                                sub: recentActivity.length > 0 ? (
+                                    <div className="flex flex-col gap-0.5">
+                                        {recentActivity.slice(0, 3).map((a, i) => (
+                                            <div key={i} className="flex items-center gap-1.5">
+                                                {a.icon}
+                                                <span className="text-[11px] text-gray-500 truncate">{a.text}</span>
+                                                {a.time && <span className="text-[10px] text-gray-400 ml-auto shrink-0">{a.time}</span>}
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : <span className="text-xs text-gray-400">Henüz aktivite yok.</span>,
                             },
                             {
                                 icon: <MessageCircle className="w-4 h-4 text-[#CCFF00]" />,
@@ -346,32 +532,72 @@ export const DashboardPage = () => {
                                 value: <>{totalMessages}</>,
                                 sub: <><BarChart3 className="w-3 h-3 text-blue-500" /><span className="text-xs font-medium text-blue-600">{sentCount} teslim edildi • {pendingCount} işleniyor</span></>,
                             },
-                            {
-                                icon: <Sparkles className="w-4 h-4 text-[#CCFF00]" />,
-                                label: 'SATIŞ İPUCU',
-                                value: <span className="text-xl">Dönüşüm +%40</span>,
-                                sub: <><Lightbulb className="w-3 h-3 text-amber-500 shrink-0 mt-0.5" /><span className="text-xs font-medium text-amber-600 line-clamp-2">Özelleştirilmiş mesajlar sayesinde potansiyellerinizi ciddi oranda artırın.</span></>,
-                            },
                         ];
                         const idx = slide2 % msgSlides.length;
                         const slide = msgSlides[idx];
+                        const searchActive2 = isSearching || automationProgress > 0;
+                        // Live data for search mode
+                        const liveEmail = leads.filter(l => l.email && l.email !== 'N/A' && l.email.includes('@')).length;
+                        const liveWebsite = leads.filter(l => l.website).length;
+                        const livePhone = leads.filter(l => l.phone && l.phone.length > 3).length;
+                        const liveFull = leads.filter(l => l.phone && l.email && l.email !== 'N/A' && l.email.includes('@')).length;
+                        const liveQuality = leads.length > 0 ? Math.round((liveFull / leads.length) * 100) : 0;
                         return (
                             <div className="flex-1 min-w-0 group relative rounded-2xl p-5 bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden">
-                                <div className="absolute top-2.5 right-5 flex gap-1">
-                                    {msgSlides.map((_, i) => (
-                                        <div key={i} className={cn("w-1.5 h-1.5 rounded-full transition-all duration-300", i === idx ? "bg-slate-900 w-3" : "bg-gray-300")} />
-                                    ))}
-                                </div>
-                                <div className="relative h-[110px]">
-                                    <div key={slide2} className="absolute inset-0 animate-slideUp">
-                                        <div className="flex items-center justify-between mb-3">
-                                            <p className="text-[11px] font-semibold text-gray-400 tracking-wider uppercase truncate pr-4">{slide.label}</p>
-                                            <div className="p-2.5 rounded-xl bg-slate-900 shrink-0">{slide.icon}</div>
-                                        </div>
-                                        <h3 className="text-2xl font-bold text-gray-900 tracking-tight truncate">{slide.value}</h3>
-                                        <div className="mt-2 flex items-start gap-1.5 line-clamp-2 leading-snug break-words whitespace-normal">{slide.sub}</div>
+                                {!searchActive2 && (
+                                    <div className="absolute top-2.5 right-5 flex gap-1">
+                                        {msgSlides.map((_, i) => (
+                                            <div key={i} className={cn("w-1.5 h-1.5 rounded-full transition-all duration-300", i === idx ? "bg-slate-900 w-3" : "bg-gray-300")} />
+                                        ))}
                                     </div>
-                                </div>
+                                )}
+                                {searchActive2 ? (
+                                    <div key="card2-search" className="animate-slideUp">
+                                        <div className="flex items-center justify-between mb-2.5">
+                                            <p className="text-[11px] font-semibold text-gray-400 tracking-wider uppercase">CANLI VERİ</p>
+                                            <div className="p-2.5 rounded-xl bg-slate-900 shrink-0">
+                                                <Activity className="w-4 h-4 text-[#CCFF00]" />
+                                            </div>
+                                        </div>
+                                        {/* 2x2 colored mini-cards */}
+                                        <div className="grid grid-cols-2 gap-1.5 mb-2">
+                                            <div className="rounded-lg bg-blue-50 border border-blue-100 px-2.5 py-1.5">
+                                                <div className="text-[9px] text-blue-400 font-semibold tracking-wide mb-0.5">EMAIL</div>
+                                                <div className="text-sm font-bold text-blue-700">📧 {liveEmail}</div>
+                                            </div>
+                                            <div className="rounded-lg bg-purple-50 border border-purple-100 px-2.5 py-1.5">
+                                                <div className="text-[9px] text-purple-400 font-semibold tracking-wide mb-0.5">WEBSİTE</div>
+                                                <div className="text-sm font-bold text-purple-700">🌐 {liveWebsite}</div>
+                                            </div>
+                                            <div className="rounded-lg bg-slate-50 border border-slate-100 px-2.5 py-1.5">
+                                                <div className="text-[9px] text-gray-400 font-semibold tracking-wide mb-0.5">TELEFON</div>
+                                                <div className="text-sm font-bold text-gray-700">📱 {livePhone}</div>
+                                            </div>
+                                            <div className="rounded-lg bg-green-50 border border-green-100 px-2.5 py-1.5">
+                                                <div className="text-[9px] text-green-500 font-semibold tracking-wide mb-0.5">TAM VERİ</div>
+                                                <div className="text-sm font-bold text-green-700">⭐ {liveFull}</div>
+                                            </div>
+                                        </div>
+                                        {/* Quality bar */}
+                                        <div className="flex items-center gap-2">
+                                            <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                                <div className="h-full bg-[#CCFF00] rounded-full transition-all duration-700" style={{width: `${liveQuality}%`}} />
+                                            </div>
+                                            <span className="text-[11px] font-bold text-gray-600 shrink-0">%{liveQuality} kalite</span>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="relative h-[110px]">
+                                        <div key={slide2} className="absolute inset-0 animate-slideUp">
+                                            <div className="flex items-center justify-between mb-3">
+                                                <p className="text-[11px] font-semibold text-gray-400 tracking-wider uppercase truncate pr-4">{slide.label}</p>
+                                                <div className="p-2.5 rounded-xl bg-slate-900 shrink-0">{slide.icon}</div>
+                                            </div>
+                                            <h3 className="text-2xl font-bold text-gray-900 tracking-tight truncate">{slide.value}</h3>
+                                            <div className="mt-2 flex items-start gap-1.5 line-clamp-2 leading-snug break-words whitespace-normal">{slide.sub}</div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         );
                     })()}
@@ -380,6 +606,18 @@ export const DashboardPage = () => {
                     {(() => {
                         const convRate = leads.length > 0 ? Math.round((sentCount / leads.length) * 100) : 0;
                         const efficiency = leads.length > 0 ? Math.round((sentCount / leads.length) * 100) : 0;
+                        // Lead kalite skoru
+                        const leadsWithEmailQ = leads.filter(l => l.email && l.email !== 'N/A' && l.email.includes('@')).length;
+                        const leadsWithWebsiteQ = leads.filter(l => l.website).length;
+                        const highQuality = leads.filter(l => l.phone && l.email && l.email !== 'N/A' && l.email.includes('@')).length;
+                        const qualityRate = leads.length > 0 ? Math.round((highQuality / leads.length) * 100) : 0;
+
+                        // Pipeline
+                        const newLeads = leads.filter(l => !l.status || l.status === 'new').length;
+                        const contacted = leads.filter(l => l.status === 'contacted').length;
+                        const interested = leads.filter(l => l.status === 'interested').length;
+                        const closed = leads.filter(l => l.status === 'closed').length;
+
                         const convSlides = [
                             {
                                 icon: <TrendingUp className="w-4 h-4 text-[#CCFF00]" />,
@@ -390,16 +628,33 @@ export const DashboardPage = () => {
                                     : <><TrendingUp className="w-3 h-3 text-amber-500" /><span className="text-xs font-medium text-amber-600">{leads.length - sentCount} yeni temas noktamız var.</span></>,
                             },
                             {
+                                icon: <Sparkles className="w-4 h-4 text-[#CCFF00]" />,
+                                label: 'LEAD KALİTESİ',
+                                value: <span className="text-2xl">%{qualityRate}</span>,
+                                sub: <div className="flex items-center gap-3 mt-0.5">
+                                    <span className="flex items-center gap-1 text-[11px] text-gray-500"><Mail className="w-3 h-3 text-blue-400" />{leadsWithEmailQ} email</span>
+                                    <span className="flex items-center gap-1 text-[11px] text-gray-500"><Globe className="w-3 h-3 text-purple-400" />{leadsWithWebsiteQ} site</span>
+                                    <span className="flex items-center gap-1 text-[11px] text-green-600 font-medium"><CheckCircle2 className="w-3 h-3" />{highQuality} tam</span>
+                                </div>,
+                            },
+                            {
                                 icon: <BarChart3 className="w-4 h-4 text-[#CCFF00]" />,
+                                label: 'SATIŞ HUNİSİ',
+                                value: <span className="text-xl">{leads.length > 0 ? `${newLeads} aktif` : '—'}</span>,
+                                sub: leads.length > 0 ? (
+                                    <div className="flex items-center gap-2 mt-0.5">
+                                        <span className="text-[11px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600">{newLeads} yeni</span>
+                                        <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-600">{contacted} ulaşıldı</span>
+                                        <span className="text-[11px] px-1.5 py-0.5 rounded bg-green-50 text-green-600">{interested} ilgili</span>
+                                        {closed > 0 && <span className="text-[11px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">{closed} kapandı</span>}
+                                    </div>
+                                ) : <span className="text-xs text-gray-400">Lead arayarak huniyi doldurun.</span>,
+                            },
+                            {
+                                icon: <Target className="w-4 h-4 text-[#CCFF00]" />,
                                 label: 'ERİŞİM ORANI',
                                 value: <span className="text-2xl">%{efficiency}</span>,
                                 sub: <><Target className="w-3 h-3 text-blue-500" /><span className="text-xs font-medium text-blue-600">{leads.length} fırsattan {sentCount} tanesiyle temasa geçildi.</span></>,
-                            },
-                            {
-                                icon: <Sparkles className="w-4 h-4 text-[#CCFF00]" />,
-                                label: 'MOTOR DURUMU',
-                                value: <span className="text-xl">{pendingCount > 0 ? 'İşlemde' : sentCount > 0 ? 'Tamamlandı' : 'Beklemede'}</span>,
-                                sub: <span className="text-xs text-gray-400 line-clamp-2">{pendingCount > 0 ? `Satış asistanınız arka planda ${pendingCount} işlemi hızla yürütüyor...` : 'Sistem herhangi bir göreve tam kapasite hazır.'}</span>,
                             },
                         ];
                         const idx = slide3 % convSlides.length;

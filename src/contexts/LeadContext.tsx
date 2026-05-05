@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/contexts/NotificationContext';
 import { sendLeadsToCallflow } from '@/services/callflowService';
+import { useRateLimit } from '@/hooks/useRateLimit';
 
 interface LeadContextType {
     leads: Lead[];
@@ -38,6 +39,7 @@ export const LeadContext = createContext<LeadContextType | null>(null);
 export const LeadProvider = ({ children }: { children: ReactNode }) => {
     const { user } = useAuth();
     const { addNotification } = useNotifications();
+    const { checkAndIncrement } = useRateLimit();
 
     // Core State
     const [leads, setLeads] = useState<Lead[]>([]);
@@ -199,6 +201,10 @@ export const LeadProvider = ({ children }: { children: ReactNode }) => {
     };
 
     const searchLeads = async (config: ScheduleConfig) => {
+        // ── Rate limit kontrolü ──────────────────────────────────────
+        const allowed = await checkAndIncrement();
+        if (!allowed) return; // toast zaten gösterildi
+
         setIsSearching(true);
         setAutomationProgress(0);
         setCompletedSteps([false, false, false, false]);
@@ -227,6 +233,22 @@ export const LeadProvider = ({ children }: { children: ReactNode }) => {
 
             const leadCount = persistedLeads.length;
             toast.success(`${leadCount} lead bulundu ve kaydedildi!`);
+
+            // Search history'yi localStorage'a kaydet
+            try {
+                const historyKey = 'search_history';
+                const existing = JSON.parse(localStorage.getItem(historyKey) || '[]');
+                const entry = {
+                    city: config.city,
+                    district: config.district || '',
+                    sector: config.sector,
+                    limit: config.limit,
+                    resultCount: leadCount,
+                    timestamp: new Date().toISOString(),
+                };
+                const updated = [entry, ...existing].slice(0, 10); // Son 10 arama
+                localStorage.setItem(historyKey, JSON.stringify(updated));
+            } catch (_) {}
 
             await addNotification(
                 'success',

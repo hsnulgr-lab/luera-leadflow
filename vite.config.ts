@@ -45,6 +45,14 @@ export default defineConfig(({ mode }) => {
     }
   }
 
+  // Railway Bridge Proxy (AI, rate-limit vb. server-side işlemler için)
+  proxy['/api/bridge'] = {
+    target: 'http://localhost:3001',
+    changeOrigin: true,
+    secure: false,
+    rewrite: (path) => path.replace(/^\/api\/bridge/, '/api'),
+  };
+
   // Evolution API Proxy to bypass SSL / CORS
   const evoUrl = env.VITE_EVOLUTION_API_URL;
   if (evoUrl) {
