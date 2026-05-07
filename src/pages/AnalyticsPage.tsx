@@ -1,5 +1,7 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useLeads } from '@/hooks/useLeads';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
 import { StatsCard } from '@/components/dashboard/StatsCard';
 import {
     BarChart,
@@ -13,194 +15,328 @@ import {
     PieChart,
     Pie,
     Cell,
-    Area,
-    AreaChart
 } from 'recharts';
-import { TrendingUp, Users, MessageSquare, CheckCircle, Smartphone } from 'lucide-react';
+import { TrendingUp, Users, MessageSquare, Send } from 'lucide-react';
+
+// ── Yardımcı: Son N günün tarih dizisi ──────────────────────────────────────
+function lastNDays(n: number): string[] {
+    return Array.from({ length: n }, (_, i) => {
+        const d = new Date();
+        d.setDate(d.getDate() - (n - 1 - i));
+        return d.toISOString().split('T')[0]; // YYYY-MM-DD
+    });
+}
+
+// ── Yardımcı: YYYY-MM-DD → "12 May" formatı ─────────────────────────────────
+function formatDateLabel(dateStr: string): string {
+    const d = new Date(dateStr + 'T00:00:00');
+    return d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' });
+}
+
+// ── Tip tanımları ─────────────────────────────────────────────────────────────
+interface WeeklyRow {
+    name: string;   // "12 May"
+    arama: number;
+    mesaj: number;
+}
+
+interface SearchUsageRow {
+    date: string;
+    count: number;
+}
+
+interface SentLogRow {
+    sent_at: string;
+}
+
+const COLORS = ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899'];
+
+const STATUS_LABELS: Record<string, string> = {
+    new: 'Yeni',
+    contacted: 'İletişime Geçildi',
+    interested: 'İlgilendi',
+    closed: 'Kapandı',
+};
+
+const STATUS_COLORS: Record<string, string> = {
+    new: '#3b82f6',
+    contacted: '#f59e0b',
+    interested: '#10b981',
+    closed: '#8b5cf6',
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export const AnalyticsPage = () => {
     const { leads } = useLeads();
+    const { user } = useAuth();
 
-    // --- Statistics Calculation ---
-    const stats = useMemo(() => {
-        const totalLeads = leads.length;
-        const contactedLeads = leads.filter(l => l.status === 'contacted' || l.status === 'interested' || l.status === 'closed').length;
-        const interestedLeads = leads.filter(l => l.status === 'interested').length;
-        // Mocking autonomous agent actions for demo purposes since we just started it
-        const agentActions = Math.floor(totalLeads * 0.4);
+    const [weeklyData, setWeeklyData] = useState<WeeklyRow[]>([]);
+    const [totalMessagesSent, setTotalMessagesSent] = useState(0);
+    const [isLoading, setIsLoading] = useState(true);
 
-        return {
-            total: totalLeads,
-            contactedRate: totalLeads > 0 ? Math.round((contactedLeads / totalLeads) * 100) : 0,
-            conversionRate: totalLeads > 0 ? Math.round((interestedLeads / totalLeads) * 100) : 0,
-            agentActions
+    // ── Supabase'den gerçek veri çek ─────────────────────────────────────────
+    useEffect(() => {
+        if (!user) return;
+
+        const fetchRealData = async () => {
+            setIsLoading(true);
+            const days = lastNDays(7);
+            const startDate = days[0];
+
+            // 1. Arama sayıları — search_usage tablosu
+            const { data: searchRows } = await supabase
+                .from('search_usage')
+                .select('date, count')
+                .eq('user_id', user.id)
+                .gte('date', startDate) as { data: SearchUsageRow[] | null };
+
+            const searchMap: Record<string, number> = {};
+            (searchRows ?? []).forEach(row => {
+                searchMap[row.date] = row.count;
+            });
+
+            // 2. Gönderilen mesajlar — whatsapp_sent_log tablosu
+            const { data: sentRows } = await supabase
+                .from('whatsapp_sent_log')
+                .select('sent_at')
+                .eq('user_id', user.id)
+                .gte('sent_at', startDate + 'T00:00:00.000Z') as { data: SentLogRow[] | null };
+
+            const sentMap: Record<string, number> = {};
+            (sentRows ?? []).forEach(row => {
+                const day = row.sent_at.split('T')[0];
+                sentMap[day] = (sentMap[day] ?? 0) + 1;
+            });
+
+            // 3. Toplam gönderilen mesaj sayısı (tüm zamanlar)
+            const { count: totalSent } = await supabase
+                .from('whatsapp_sent_log')
+                .select('*', { count: 'exact', head: true })
+                .eq('user_id', user.id);
+
+            setTotalMessagesSent(totalSent ?? 0);
+
+            // 4. Haftalık grafik verisini birleştir
+            const merged: WeeklyRow[] = days.map(date => ({
+                name: formatDateLabel(date),
+                arama: searchMap[date] ?? 0,
+                mesaj: sentMap[date] ?? 0,
+            }));
+
+            setWeeklyData(merged);
+            setIsLoading(false);
         };
+
+        fetchRealData();
+    }, [user]);
+
+    // ── Lead istatistikleri (leads DB'den geliyor, gerçek veri) ──────────────
+    const stats = useMemo(() => {
+        const total = leads.length;
+
+        const contacted = leads.filter(l =>
+            l.status === 'contacted' || l.status === 'interested' || l.status === 'closed'
+        ).length;
+
+        const interested = leads.filter(l => l.status === 'interested').length;
+
+        // Bu hafta eklenen leadler
+        const weekAgo = new Date();
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        const thisWeekLeads = leads.filter(l => new Date(l.dateAdded) >= weekAgo).length;
+
+        // Geçen hafta eklenen leadler (karşılaştırma için)
+        const twoWeeksAgo = new Date();
+        twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+        const lastWeekLeads = leads.filter(l => {
+            const d = new Date(l.dateAdded);
+            return d >= twoWeeksAgo && d < weekAgo;
+        }).length;
+
+        const weekChange = lastWeekLeads > 0
+            ? Math.round(((thisWeekLeads - lastWeekLeads) / lastWeekLeads) * 100)
+            : thisWeekLeads > 0 ? 100 : 0;
+
+        const contactedRate = total > 0 ? Math.round((contacted / total) * 100) : 0;
+        const conversionRate = total > 0 ? Math.round((interested / total) * 100) : 0;
+
+        return { total, thisWeekLeads, weekChange, contactedRate, conversionRate };
     }, [leads]);
 
-    // --- Chart Data Preparation ---
-
-    // 1. Sector Distribution (Pie Chart)
+    // ── Sektörel dağılım (leads tablosundan, gerçek veri) ────────────────────
     const sectorData = useMemo(() => {
-        const distribution: Record<string, number> = {};
+        const dist: Record<string, number> = {};
         leads.forEach(lead => {
-            // Extract sector from tags or company category
-            const sector = lead.tags?.[0] || 'Genel';
-            distribution[sector] = (distribution[sector] || 0) + 1;
+            const sector = lead.apolloSector || lead.tags?.[0] || 'Genel';
+            dist[sector] = (dist[sector] ?? 0) + 1;
         });
-        return Object.entries(distribution).map(([name, value]) => ({ name, value }));
+        return Object.entries(dist)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 6)
+            .map(([name, value]) => ({ name, value }));
     }, [leads]);
 
-    // 2. Daily Activity (Bar Chart - Simulated for Demo + Real Dates)
-    const activityData = useMemo(() => {
-        const days = ['Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar', 'Pazartesi'];
-        return days.map((day) => ({
-            name: day,
-            arama: Math.floor(Math.random() * 20) + 5,
-            mesaj: Math.floor(Math.random() * 15) + 3,
-            cevap: Math.floor(Math.random() * 8) + 1,
+    // ── Lead durumu dağılımı (leads tablosundan, gerçek veri) ────────────────
+    const statusData = useMemo(() => {
+        const dist: Record<string, number> = { new: 0, contacted: 0, interested: 0, closed: 0 };
+        leads.forEach(lead => {
+            if (lead.status in dist) dist[lead.status]++;
+        });
+        return Object.entries(dist).map(([status, count]) => ({
+            name: STATUS_LABELS[status] ?? status,
+            count,
+            fill: STATUS_COLORS[status] ?? '#6b7280',
         }));
-    }, []);
+    }, [leads]);
 
-    // 3. Agent Performance (Area Chart)
-    const agentPerformanceData = useMemo(() => {
-        return [
-            { time: '09:00', manuel: 2, otonom: 10 },
-            { time: '11:00', manuel: 5, otonom: 25 },
-            { time: '13:00', manuel: 3, otonom: 15 },
-            { time: '15:00', manuel: 8, otonom: 32 },
-            { time: '17:00', manuel: 6, otonom: 28 },
-        ];
-    }, []);
+    // ── Yükleniyor durumu ─────────────────────────────────────────────────────
+    const weekChangeLabel = stats.weekChange > 0
+        ? `+${stats.weekChange}% geçen haftaya göre`
+        : stats.weekChange < 0
+            ? `${stats.weekChange}% geçen haftaya göre`
+            : 'Geçen haftayla aynı';
 
-    const COLORS = ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444'];
+    const weekChangeType = stats.weekChange > 0 ? 'positive' : stats.weekChange < 0 ? 'negative' : 'neutral';
 
     return (
         <div className="p-6 space-y-6">
+            {/* Başlık */}
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold">Analiz ve Raporlama</h1>
-                    <p className="text-muted-foreground text-sm">Gerçek zamanlı lead performansı ve ajan aktiviteleri.</p>
+                    <p className="text-muted-foreground text-sm">Hesabınıza ait gerçek zamanlı veriler.</p>
                 </div>
                 <div className="text-sm text-muted-foreground bg-secondary/50 px-3 py-1 rounded-md">
-                    Son Güncelleme: {new Date().toLocaleTimeString()}
+                    Son Güncelleme: {new Date().toLocaleTimeString('tr-TR')}
                 </div>
             </div>
 
-            {/* Top Stats Cards */}
+            {/* Stat Kartları */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <StatsCard
                     title="Toplam Lead"
                     value={stats.total}
-                    change="+12% bu hafta"
+                    change={`Bu hafta ${stats.thisWeekLeads} yeni`}
                     changeType="positive"
                     icon={Users}
                 />
                 <StatsCard
-                    title="İletişim Oranı"
-                    value={`%${stats.contactedRate}`}
-                    change="WhatsApp + SMS"
+                    title="Bu Hafta Eklendi"
+                    value={stats.thisWeekLeads}
+                    change={weekChangeLabel}
+                    changeType={weekChangeType}
+                    icon={TrendingUp}
+                />
+                <StatsCard
+                    title="Gönderilen Mesaj"
+                    value={totalMessagesSent}
+                    change={`${stats.contactedRate}% iletişim oranı`}
                     changeType="neutral"
-                    icon={MessageSquare}
+                    icon={Send}
                 />
                 <StatsCard
                     title="Dönüşüm (İlgili)"
                     value={`%${stats.conversionRate}`}
-                    change="+5% artış"
-                    changeType="positive"
-                    icon={TrendingUp}
-                />
-                <StatsCard
-                    title="Otonom Ajan İşlemi"
-                    value={stats.agentActions}
-                    change="Aktif Çalışıyor"
-                    changeType="positive"
-                    icon={Smartphone}
+                    change={`${leads.filter(l => l.status === 'interested').length} ilgili lead`}
+                    changeType={stats.conversionRate > 0 ? 'positive' : 'neutral'}
+                    icon={MessageSquare}
                 />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Main Activity Chart */}
+                {/* Haftalık Aktivite Grafiği — Gerçek Veri */}
                 <div className="glass-card p-6 lg:col-span-2">
-                    <h3 className="text-lg font-semibold mb-6">Haftalık Aktivite Özeti</h3>
+                    <div className="flex items-center justify-between mb-6">
+                        <h3 className="text-lg font-semibold">Son 7 Günlük Aktivite</h3>
+                        {isLoading && (
+                            <span className="text-xs text-muted-foreground animate-pulse">Yükleniyor...</span>
+                        )}
+                    </div>
                     <div className="h-[300px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={activityData}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
-                                <XAxis dataKey="name" stroke="#6b7280" fontSize={12} tickLine={false} axisLine={false} />
-                                <YAxis stroke="#6b7280" fontSize={12} tickLine={false} axisLine={false} />
-                                <Tooltip
-                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                    cursor={{ fill: '#f3f4f6' }}
-                                />
-                                <Legend />
-                                <Bar dataKey="arama" name="Lead Araması" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                                <Bar dataKey="mesaj" name="Mesaj Gönderimi" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
-                                <Bar dataKey="cevap" name="Gelen Cevap" fill="#10b981" radius={[4, 4, 0, 0]} />
-                            </BarChart>
-                        </ResponsiveContainer>
+                        {!isLoading && weeklyData.every(d => d.arama === 0 && d.mesaj === 0) ? (
+                            <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-2">
+                                <p className="text-sm">Henüz aktivite verisi yok.</p>
+                                <p className="text-xs">Lead arama veya mesaj gönderdikçe burada görünecek.</p>
+                            </div>
+                        ) : (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={weeklyData}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
+                                    <XAxis dataKey="name" stroke="#6b7280" fontSize={12} tickLine={false} axisLine={false} />
+                                    <YAxis stroke="#6b7280" fontSize={12} tickLine={false} axisLine={false} allowDecimals={false} />
+                                    <Tooltip
+                                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                                        cursor={{ fill: 'rgba(0,0,0,0.04)' }}
+                                    />
+                                    <Legend />
+                                    <Bar dataKey="arama" name="Lead Araması" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                                    <Bar dataKey="mesaj" name="Gönderilen Mesaj" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        )}
                     </div>
                 </div>
 
-                {/* Sector Distribution */}
+                {/* Sektörel Dağılım — Gerçek Veri */}
                 <div className="glass-card p-6">
                     <h3 className="text-lg font-semibold mb-4">Sektörel Dağılım</h3>
                     <div className="h-[300px] w-full flex items-center justify-center">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                                <Pie
-                                    data={sectorData}
-                                    cx="50%"
-                                    cy="50%"
-                                    innerRadius={60}
-                                    outerRadius={80}
-                                    paddingAngle={5}
-                                    dataKey="value"
-                                >
-                                    {sectorData.map((_, index) => (
-                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                    ))}
-                                </Pie>
-                                <Tooltip />
-                                <Legend verticalAlign="bottom" height={36} />
-                            </PieChart>
-                        </ResponsiveContainer>
+                        {sectorData.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">Lead ekledikçe burada görünecek.</p>
+                        ) : (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                    <Pie
+                                        data={sectorData}
+                                        cx="50%"
+                                        cy="50%"
+                                        innerRadius={60}
+                                        outerRadius={90}
+                                        paddingAngle={4}
+                                        dataKey="value"
+                                    >
+                                        {sectorData.map((_, index) => (
+                                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip formatter={(v) => [`${v ?? 0} lead`, '']} />
+                                    <Legend verticalAlign="bottom" height={36} />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        )}
                     </div>
                 </div>
 
-                {/* Agent Performance */}
+                {/* Lead Durumu Dağılımı — Gerçek Veri */}
                 <div className="glass-card p-6">
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-semibold">Otonom Ajan Performansı</h3>
-                        <div className="flex items-center gap-2 text-xs font-medium text-purple-700 bg-purple-50 px-2 py-1 rounded-full">
-                            <CheckCircle className="w-3 h-3" />
-                            Canlı Veri
-                        </div>
-                    </div>
+                    <h3 className="text-lg font-semibold mb-4">Lead Durumu</h3>
                     <div className="h-[300px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={agentPerformanceData}>
-                                <defs>
-                                    <linearGradient id="colorOtonom" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.8} />
-                                        <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
-                                    </linearGradient>
-                                    <linearGradient id="colorManuel" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8} />
-                                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                                    </linearGradient>
-                                </defs>
-                                <XAxis dataKey="time" stroke="#6b7280" fontSize={12} tickLine={false} axisLine={false} />
-                                <YAxis stroke="#6b7280" fontSize={12} tickLine={false} axisLine={false} />
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                                <Tooltip />
-                                <Area type="monotone" dataKey="otonom" name="Otonom İşlem" stroke="#8b5cf6" fillOpacity={1} fill="url(#colorOtonom)" />
-                                <Area type="monotone" dataKey="manuel" name="Manuel İşlem" stroke="#3b82f6" fillOpacity={1} fill="url(#colorManuel)" />
-                            </AreaChart>
-                        </ResponsiveContainer>
+                        {leads.length === 0 ? (
+                            <div className="h-full flex items-center justify-center">
+                                <p className="text-sm text-muted-foreground">Henüz lead yok.</p>
+                            </div>
+                        ) : (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={statusData} layout="vertical" barSize={28}>
+                                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e5e7eb" />
+                                    <XAxis type="number" stroke="#6b7280" fontSize={12} tickLine={false} axisLine={false} allowDecimals={false} />
+                                    <YAxis type="category" dataKey="name" stroke="#6b7280" fontSize={12} tickLine={false} axisLine={false} width={120} />
+                                    <Tooltip
+                                        formatter={(v) => [`${v ?? 0} lead`, 'Adet']}
+                                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                                    />
+                                    <Bar dataKey="count" name="Lead Sayısı" radius={[0, 4, 4, 0]}>
+                                        {statusData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={entry.fill} />
+                                        ))}
+                                    </Bar>
+                                </BarChart>
+                            </ResponsiveContainer>
+                        )}
                     </div>
                 </div>
             </div>
         </div>
     );
 };
-
