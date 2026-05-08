@@ -191,44 +191,43 @@ export const WhatsAppProvider = ({ children }: { children: ReactNode }) => {
             ? await getUserInstanceName(user.id)
             : (import.meta.env.VITE_EVOLUTION_INSTANCE_NAME || 'testwp');
 
-        // ── Her mesajı sırayla, anti-spam delay ile gönder ──────────────────
-        for (let i = 0; i < allowedItems.length; i++) {
-            const item = allowedItems[i];
+        // ── n8n üzerinden toplu gönder (arka planda, tab kapatılabilir) ──────
+        const leadsPayload = allowedItems.map(item => ({
+            phone:       item.lead.phone,
+            message:     item.message,
+            companyName: item.lead.name,
+        }));
 
-            // Gönderiliyor durumuna al
-            setMessageQueue(prev => prev.map(msg =>
-                msg.id === item.id ? { ...msg, status: 'sending' as const } : msg
-            ));
+        // Tüm itemları "sending" yap
+        const allowedIds = new Set(allowedItems.map(i => i.id));
+        setMessageQueue(prev => prev.map(msg =>
+            allowedIds.has(msg.id) ? { ...msg, status: 'sending' as const } : msg
+        ));
 
-            // Evolution API'ye gönder
-            const result = await evolutionService.sendTextMessage(
-                evInstanceName,
-                item.lead.phone,
-                item.message
-            );
+        try {
+            const result = await n8nEvolutionService.sendBulkMessages(leadsPayload, evInstanceName);
 
             if (result.success) {
+                // n8n kabul etti — UI'da sent olarak işaretle
                 setMessageQueue(prev => prev.map(msg =>
-                    msg.id === item.id ? { ...msg, status: 'sent' as const } : msg
+                    allowedIds.has(msg.id) ? { ...msg, status: 'sent' as const } : msg
                 ));
-                await markAsSent([{ id: item.lead.id, name: item.lead.name }]);
-                if (item.lead.phone) {
-                    await addToCooldown([{ phone: item.lead.phone, leadName: item.lead.name }]);
-                }
+                await markAsSent(allowedItems.map(i => ({ id: i.lead.id, name: i.lead.name })));
+                await addToCooldown(
+                    allowedItems
+                        .filter(i => i.lead.phone)
+                        .map(i => ({ phone: i.lead.phone, leadName: i.lead.name }))
+                );
             } else {
-                setMessageQueue(prev => prev.map(msg =>
-                    msg.id === item.id
-                        ? { ...msg, status: 'failed' as const, error: result.error || 'Gönderilemedi' }
-                        : msg
-                ));
+                throw new Error(result.message);
             }
-
-            // 🕐 Anti-spam delay: son mesaj değilse bekle (10–85 saniye arası random)
-            if (i < allowedItems.length - 1) {
-                const delay = Math.floor(Math.random() * (85000 - 10000 + 1)) + 10000;
-                console.log(`[Anti-spam] ${item.lead.name} gönderildi → ${Math.round(delay / 1000)}sn bekleniyor...`);
-                await new Promise(res => setTimeout(res, delay));
-            }
+        } catch (err) {
+            console.error('[handleSendQueue] n8n bulk failed:', err);
+            setMessageQueue(prev => prev.map(msg =>
+                allowedIds.has(msg.id)
+                    ? { ...msg, status: 'failed' as const, error: 'Gönderim başlatılamadı' }
+                    : msg
+            ));
         }
 
         setIsSending(false);
