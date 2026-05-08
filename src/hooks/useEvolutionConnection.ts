@@ -140,6 +140,16 @@ export const useEvolutionConnection = (instanceName: string | null) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [instanceName]);
 
+    // ─── QR al — yeni instance için retry mekanizması ──────────────────────
+    const fetchQRWithRetry = useCallback(async (iName: string, maxTries = 4): Promise<string | null> => {
+        for (let i = 0; i < maxTries; i++) {
+            if (i > 0) await new Promise(r => setTimeout(r, 2000)); // 2s bekle
+            const qr = await evolutionService.getQRCode(iName);
+            if (qr) return qr;
+        }
+        return null;
+    }, []);
+
     // ─── Bağlan: QR al + polling + WS ─────────────────────────────────────
     const connect = useCallback(async () => {
         if (!instanceName) return;
@@ -150,8 +160,8 @@ export const useEvolutionConnection = (instanceName: string | null) => {
             // 1. Instance yoksa oluştur
             await evolutionService.ensureInstance(instanceName);
 
-            // 2. QR kodunu HTTP ile al (anında göster)
-            const qr = await evolutionService.getQRCode(instanceName);
+            // 2. QR kodunu HTTP ile al (yeni instance için retry'lı)
+            const qr = await fetchQRWithRetry(instanceName);
             if (mountedRef.current) {
                 if (qr) {
                     setQrCode(qr);
@@ -178,7 +188,7 @@ export const useEvolutionConnection = (instanceName: string | null) => {
                 setIsLoading(false);
             }
         }
-    }, [instanceName, startPolling, tryWebSocket]);
+    }, [instanceName, fetchQRWithRetry, startPolling, tryWebSocket]);
 
     // ─── Bağlantıyı kes ────────────────────────────────────────────────────
     const disconnect = useCallback(async () => {
