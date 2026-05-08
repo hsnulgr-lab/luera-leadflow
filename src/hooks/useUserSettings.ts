@@ -13,6 +13,8 @@ export interface UserSettings {
     sender_name: string | null;          // "Furkan"
     business_website: string | null;
     business_instagram: string | null;
+    // Onboarding
+    onboarding_completed: boolean | null;
 }
 
 const DEFAULT_SETTINGS: UserSettings = {
@@ -25,6 +27,7 @@ const DEFAULT_SETTINGS: UserSettings = {
     sender_name: null,
     business_website: null,
     business_instagram: null,
+    onboarding_completed: null,
 };
 
 export const useUserSettings = () => {
@@ -41,7 +44,7 @@ export const useUserSettings = () => {
         const load = async () => {
             const { data } = await supabase
                 .from('user_settings')
-                .select('n8n_webhook_url, gemini_api_key, evolution_instance_name, business_name, business_sector, business_offer, sender_name, business_website, business_instagram')
+                .select('n8n_webhook_url, gemini_api_key, evolution_instance_name, business_name, business_sector, business_offer, sender_name, business_website, business_instagram, onboarding_completed')
                 .eq('user_id', user.id)
                 .single();
 

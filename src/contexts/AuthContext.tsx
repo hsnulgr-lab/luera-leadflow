@@ -123,6 +123,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                             n8n_webhook_url: import.meta.env.VITE_N8N_WEBHOOK_URL || null,
                             gemini_api_key: null,
                             evolution_instance_name: instanceName,
+                            onboarding_completed: false,
                         }, { onConflict: 'user_id' });
                     } catch (e) {
                         console.error('[Signup] Background provisioning failed:', e);

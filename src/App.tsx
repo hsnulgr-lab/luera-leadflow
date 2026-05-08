@@ -4,6 +4,7 @@ import { NotificationProvider } from "./contexts/NotificationContext";
 import { LeadProvider } from "./contexts/LeadContext";
 import { WhatsAppProvider } from "./contexts/WhatsAppContext";
 import { LoginPage } from "./pages/LoginPage";
+import { OnboardingPage } from "./pages/OnboardingPage";
 import { Layout } from "./components/layout/Layout";
 import { DashboardPage } from "./pages/DashboardPage";
 import { LeadsPage } from "./pages/LeadsPage";
@@ -13,6 +14,7 @@ import WhatsAppPage from "./pages/WhatsAppPage";
 import { SchedulerPage } from "./pages/SchedulerPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { ResetPasswordPage } from "./pages/ResetPasswordPage";
+import { useUserSettings } from "./hooks/useUserSettings";
 import { Loader2 } from "lucide-react";
 
 import { ErrorBoundary } from "./components/common/ErrorBoundary";
@@ -20,8 +22,9 @@ import { ErrorBoundary } from "./components/common/ErrorBoundary";
 // Protected Route Component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     const { isAuthenticated, isLoading } = useAuth();
+    const { settings, isLoading: settingsLoading } = useUserSettings();
 
-    if (isLoading) {
+    if (isLoading || settingsLoading) {
         return (
             <div className="min-h-screen bg-gray-950 flex items-center justify-center">
                 <div className="text-center">
@@ -34,6 +37,11 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
     if (!isAuthenticated) {
         return <Navigate to="/login" replace />;
+    }
+
+    // Yeni kullanıcı (onboarding_completed === false) → onboarding'e yönlendir
+    if (settings.onboarding_completed === false) {
+        return <Navigate to="/onboarding" replace />;
     }
 
     return (
@@ -54,6 +62,7 @@ const App = () => {
                         <Routes>
                             <Route path="/login" element={<LoginPage />} />
                             <Route path="/reset-password" element={<ResetPasswordPage />} />
+                            <Route path="/onboarding" element={<OnboardingPage />} />
 
                             <Route path="/" element={
                                 <ProtectedRoute>

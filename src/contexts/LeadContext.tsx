@@ -30,6 +30,7 @@ interface LeadContextType {
     analyzeSelected: () => void;
     bulkSend: () => Promise<void>;
     updateLeadStatus: (id: string, status: string) => Promise<void>;
+    updateLeadFollowup: (id: string, followupAt: string | null, notes: string | null) => Promise<void>;
     deleteLead: (id: string) => Promise<void>;
     refetch: () => Promise<void>;
 }
@@ -122,6 +123,9 @@ export const LeadProvider = ({ children }: { children: ReactNode }) => {
                 priority: item.priority || null,
                 dateAdded: item.created_at,
                 score: item.score || 0,
+                next_followup_at: item.next_followup_at || null,
+                notes: item.notes || null,
+                last_contact_at: item.last_contact_at || null,
             }));
 
             setLeads(mappedLeads);
@@ -282,6 +286,25 @@ export const LeadProvider = ({ children }: { children: ReactNode }) => {
         }
 
         setLeads(prev => prev.map(l => l.id === id ? { ...l, status: status as Lead['status'] } : l));
+    };
+
+    const updateLeadFollowup = async (id: string, followupAt: string | null, notes: string | null) => {
+        const { error } = await supabase
+            .from('leads')
+            .update({ next_followup_at: followupAt, notes, last_contact_at: new Date().toISOString() })
+            .eq('id', id);
+
+        if (error) {
+            console.error('Error updating followup:', error);
+            toast.error('Takip tarihi kaydedilemedi');
+            return;
+        }
+
+        setLeads(prev => prev.map(l => l.id === id
+            ? { ...l, next_followup_at: followupAt, notes, last_contact_at: new Date().toISOString() }
+            : l
+        ));
+        toast.success('Takip tarihi kaydedildi');
     };
 
     const deleteLead = async (id: string) => {
@@ -473,6 +496,7 @@ export const LeadProvider = ({ children }: { children: ReactNode }) => {
             analyzeSelected,
             bulkSend,
             updateLeadStatus,
+            updateLeadFollowup,
             deleteLead,
             refetch: fetchLeads,
         }}>

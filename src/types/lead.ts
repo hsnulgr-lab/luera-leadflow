@@ -22,6 +22,10 @@ export interface Lead {
     address?: string;
     rating?: string | number;
     apolloSector?: string;
+    // Mini CRM
+    next_followup_at?: string | null;
+    notes?: string | null;
+    last_contact_at?: string | null;
 }
 
 export type PhoneType   = 'mobil' | 'sabit' | 'her ikisi';

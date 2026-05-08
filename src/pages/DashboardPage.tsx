@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { LeadCard } from "@/components/dashboard/LeadCard";
 import { SchedulePanel } from "@/components/dashboard/SchedulePanel";
 import { LeadDetailPanel } from "@/components/dashboard/LeadDetailPanel";
+import { TodayTasks } from "@/components/dashboard/TodayTasks";
 import { AIMessageDialog } from "@/components/dashboard/AIMessageDialog";
 import { AIOfferDialog } from "@/components/dashboard/AIOfferDialog";
 import { useLeads } from "@/hooks/useLeads";
@@ -149,6 +150,8 @@ export const DashboardPage = () => {
         <>
             <div className="p-6">
 
+                {/* Today's Follow-up Tasks */}
+                <TodayTasks onLeadClick={setSelectedDetailLead} />
 
                 {/* Stats Bar */}
                 <div className="flex gap-4 mb-6">
@@ -172,7 +175,7 @@ export const DashboardPage = () => {
                             {
                                 icon: <Coffee className="w-4 h-4 text-[#CCFF00]" />,
                                 label: 'LUERA AI',
-                                value: <span className="text-xl">{greeting}, <span className="capitalize">{user?.name || 'Kullanıcı'}</span> 👋</span>,
+                                value: <>{greeting}, <span className="capitalize">{user?.name || 'Kullanıcı'}</span> 👋</>,
                                 sub: <span className="text-xs text-gray-400">{leads.length > 0 ? `Sizin için ${leads.length} potansiyel müşteri hazırladım.` : 'Yeni fırsatlar bulmak için arama başlatın.'}</span>,
                             },
                             {
@@ -184,10 +187,10 @@ export const DashboardPage = () => {
                             {
                                 icon: <History className="w-4 h-4 text-[#CCFF00]" />,
                                 label: 'SON ARAMALAR',
-                                value: <span className="text-xl">{searchHistory.length > 0 ? `${searchHistory.length} arama` : '—'}</span>,
+                                value: <>{searchHistory.length > 0 ? `${searchHistory.length} arama` : '—'}</>,
                                 sub: searchHistory.length > 0 ? (
                                     <div className="flex flex-col gap-0.5 mt-0.5">
-                                        {searchHistory.slice(0, 3).map((h, i) => (
+                                        {searchHistory.slice(0, 2).map((h, i) => (
                                             <div key={i} className="flex items-center gap-1.5">
                                                 <Search className="w-2.5 h-2.5 text-gray-400 shrink-0" />
                                                 <span className="text-[11px] text-gray-500 truncate capitalize">
@@ -202,7 +205,7 @@ export const DashboardPage = () => {
                             {
                                 icon: <CalendarClock className="w-4 h-4 text-[#CCFF00]" />,
                                 label: 'BUGÜNÜN ÖZETİ',
-                                value: <span className="text-2xl">{todayLeads}</span>,
+                                value: <>{todayLeads} lead</>,
                                 sub: <div className="flex items-center gap-3 mt-0.5">
                                     <span className="flex items-center gap-1 text-[11px] text-gray-500"><Mail className="w-3 h-3 text-blue-400" />{leadsWithEmail} email</span>
                                     <span className="flex items-center gap-1 text-[11px] text-gray-500"><Globe className="w-3 h-3 text-purple-400" />{leadsWithWebsite} site</span>
@@ -258,14 +261,14 @@ export const DashboardPage = () => {
                                         }
                                     </div>
                                 ) : (
-                                    <div className="relative h-[110px]">
+                                    <div className="relative h-[100px]">
                                         <div key={slide1} className="absolute inset-0 animate-slideUp">
-                                            <div className="flex items-center justify-between mb-3">
-                                                <p className="text-[11px] font-semibold text-gray-400 tracking-wider uppercase truncate pr-4">{slide.label}</p>
-                                                <div className="p-2.5 rounded-xl bg-slate-900 shrink-0">{slide.icon}</div>
+                                            <div className="flex items-center justify-between mb-2">
+                                                <p className="text-[10px] font-semibold text-gray-400 tracking-wider uppercase truncate pr-3">{slide.label}</p>
+                                                <div className="p-2 rounded-xl bg-slate-900 shrink-0">{slide.icon}</div>
                                             </div>
-                                            <h3 className="text-2xl font-bold text-gray-900 tracking-tight truncate">{slide.value}</h3>
-                                            <div className="mt-2 flex items-start gap-1.5 line-clamp-2 leading-snug break-words whitespace-normal">{slide.sub}</div>
+                                            <h3 className="text-lg font-bold text-gray-900 tracking-tight truncate">{slide.value}</h3>
+                                            <div className="mt-1 flex items-start gap-1.5 line-clamp-2 leading-snug break-words whitespace-normal">{slide.sub}</div>
                                         </div>
                                     </div>
                                 )}
@@ -505,10 +508,10 @@ export const DashboardPage = () => {
                             {
                                 icon: <Activity className="w-4 h-4 text-[#CCFF00]" />,
                                 label: 'AKTİVİTE AKIŞI',
-                                value: <span className="text-xl">{recentActivity.length > 0 ? 'Son Olaylar' : '—'}</span>,
+                                value: <>{recentActivity.length > 0 ? 'Son Olaylar' : '—'}</>,
                                 sub: recentActivity.length > 0 ? (
                                     <div className="flex flex-col gap-0.5">
-                                        {recentActivity.slice(0, 3).map((a, i) => (
+                                        {recentActivity.slice(0, 2).map((a, i) => (
                                             <div key={i} className="flex items-center gap-1.5">
                                                 {a.icon}
                                                 <span className="text-[11px] text-gray-500 truncate">{a.text}</span>
@@ -587,14 +590,14 @@ export const DashboardPage = () => {
                                         </div>
                                     </div>
                                 ) : (
-                                    <div className="relative h-[110px]">
+                                    <div className="relative h-[100px]">
                                         <div key={slide2} className="absolute inset-0 animate-slideUp">
-                                            <div className="flex items-center justify-between mb-3">
-                                                <p className="text-[11px] font-semibold text-gray-400 tracking-wider uppercase truncate pr-4">{slide.label}</p>
-                                                <div className="p-2.5 rounded-xl bg-slate-900 shrink-0">{slide.icon}</div>
+                                            <div className="flex items-center justify-between mb-2">
+                                                <p className="text-[10px] font-semibold text-gray-400 tracking-wider uppercase truncate pr-3">{slide.label}</p>
+                                                <div className="p-2 rounded-xl bg-slate-900 shrink-0">{slide.icon}</div>
                                             </div>
-                                            <h3 className="text-2xl font-bold text-gray-900 tracking-tight truncate">{slide.value}</h3>
-                                            <div className="mt-2 flex items-start gap-1.5 line-clamp-2 leading-snug break-words whitespace-normal">{slide.sub}</div>
+                                            <h3 className="text-lg font-bold text-gray-900 tracking-tight truncate">{slide.value}</h3>
+                                            <div className="mt-1 flex items-start gap-1.5 line-clamp-2 leading-snug break-words whitespace-normal">{slide.sub}</div>
                                         </div>
                                     </div>
                                 )}
@@ -630,7 +633,7 @@ export const DashboardPage = () => {
                             {
                                 icon: <Sparkles className="w-4 h-4 text-[#CCFF00]" />,
                                 label: 'LEAD KALİTESİ',
-                                value: <span className="text-2xl">%{qualityRate}</span>,
+                                value: <>%{qualityRate}</>,
                                 sub: <div className="flex items-center gap-3 mt-0.5">
                                     <span className="flex items-center gap-1 text-[11px] text-gray-500"><Mail className="w-3 h-3 text-blue-400" />{leadsWithEmailQ} email</span>
                                     <span className="flex items-center gap-1 text-[11px] text-gray-500"><Globe className="w-3 h-3 text-purple-400" />{leadsWithWebsiteQ} site</span>
@@ -640,7 +643,7 @@ export const DashboardPage = () => {
                             {
                                 icon: <BarChart3 className="w-4 h-4 text-[#CCFF00]" />,
                                 label: 'SATIŞ HUNİSİ',
-                                value: <span className="text-xl">{leads.length > 0 ? `${newLeads} aktif` : '—'}</span>,
+                                value: <>{leads.length > 0 ? `${newLeads} aktif` : '—'}</>,
                                 sub: leads.length > 0 ? (
                                     <div className="flex items-center gap-2 mt-0.5">
                                         <span className="text-[11px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600">{newLeads} yeni</span>
@@ -653,7 +656,7 @@ export const DashboardPage = () => {
                             {
                                 icon: <Target className="w-4 h-4 text-[#CCFF00]" />,
                                 label: 'ERİŞİM ORANI',
-                                value: <span className="text-2xl">%{efficiency}</span>,
+                                value: <>%{efficiency}</>,
                                 sub: <><Target className="w-3 h-3 text-blue-500" /><span className="text-xs font-medium text-blue-600">{leads.length} fırsattan {sentCount} tanesiyle temasa geçildi.</span></>,
                             },
                         ];
@@ -673,14 +676,14 @@ export const DashboardPage = () => {
                                         <div key={i} className={cn("w-1.5 h-1.5 rounded-full transition-all duration-300", i === idx ? "bg-slate-900 w-3" : "bg-gray-300")} />
                                     ))}
                                 </div>
-                                <div className="relative h-[110px]">
+                                <div className="relative h-[100px]">
                                     <div key={slide3} className="absolute inset-0 animate-slideUp">
-                                        <div className="flex items-center justify-between mb-3">
-                                            <p className="text-[11px] font-semibold text-gray-400 tracking-wider uppercase truncate pr-4">{slide.label}</p>
-                                            <div className="p-2.5 rounded-xl bg-slate-900 shrink-0">{slide.icon}</div>
+                                        <div className="flex items-center justify-between mb-2">
+                                            <p className="text-[10px] font-semibold text-gray-400 tracking-wider uppercase truncate pr-3">{slide.label}</p>
+                                            <div className="p-2 rounded-xl bg-slate-900 shrink-0">{slide.icon}</div>
                                         </div>
-                                        <h3 className="text-2xl font-bold text-gray-900 tracking-tight truncate">{slide.value}</h3>
-                                        <div className="mt-2 flex items-start gap-1.5 line-clamp-2 leading-snug break-words whitespace-normal">{slide.sub}</div>
+                                        <h3 className="text-lg font-bold text-gray-900 tracking-tight truncate">{slide.value}</h3>
+                                        <div className="mt-1 flex items-start gap-1.5 line-clamp-2 leading-snug break-words whitespace-normal">{slide.sub}</div>
                                     </div>
                                 </div>
                             </div>
