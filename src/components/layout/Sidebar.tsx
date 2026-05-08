@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Home, Users, BarChart2, Settings, CalendarClock, ChevronLeft, ChevronRight, MessageSquare, LogOut, User, ChevronUp, ArrowUpRight } from 'lucide-react';
+import { Home, Users, BarChart2, Settings, CalendarClock, ChevronLeft, ChevronRight, MessageSquare, LogOut, User, ArrowUpRight } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { useAuth } from '@/contexts/AuthContext';
 import { NotificationDropdown } from './NotificationDropdown';
@@ -34,7 +34,7 @@ export const Sidebar = ({ activeTab, onTabChange, isCollapsed, onCollapsedChange
 
     const menuItems = [
         { id: 'dashboard', label: 'Dashboard', icon: Home },
-        { id: 'leads', label: 'Leads', icon: Users },
+        { id: 'leads', label: 'Leadler', icon: Users },
         { id: 'analytics', label: 'Analiz', icon: BarChart2 },
         { id: 'whatsapp', label: 'WhatsApp', icon: MessageSquare },
         { id: 'scheduler', label: 'Planlayıcı', icon: CalendarClock },

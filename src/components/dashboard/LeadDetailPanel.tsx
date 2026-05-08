@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { X, Mail, Phone, Globe, MapPin, Star, Users, Linkedin, Instagram, Building, Tag, Trash2, MessageCircle, PhoneCall, ExternalLink, Bell, Save } from "lucide-react";
+import { X, Mail, Phone, Globe, MapPin, Star, Users, Linkedin, Instagram, Building, Tag, Trash2, MessageCircle, PhoneCall, ExternalLink } from "lucide-react";
 import { Lead } from "@/types/lead";
 import { cn } from "@/utils/cn";
 import { useLeads } from "@/hooks/useLeads";
@@ -18,10 +17,7 @@ const getInitials = (name: string) =>
     name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
 
 export const LeadDetailPanel = ({ lead, onClose, onAgentStart, variant = 'modal' }: LeadDetailPanelProps) => {
-    const { deleteLead, updateLeadFollowup } = useLeads();
-    const [followupDate, setFollowupDate] = useState(lead?.next_followup_at?.split('T')[0] ?? '');
-    const [notes, setNotes] = useState(lead?.notes ?? '');
-    const [savingFollowup, setSavingFollowup] = useState(false);
+    const { deleteLead } = useLeads();
 
     if (!lead) return null;
 
@@ -29,13 +25,6 @@ export const LeadDetailPanel = ({ lead, onClose, onAgentStart, variant = 'modal'
         if (!window.confirm("Bu lead'i silmek istediğinize emin misiniz?")) return;
         await deleteLead(lead.id);
         onClose();
-    };
-
-    const handleSaveFollowup = async () => {
-        setSavingFollowup(true);
-        const iso = followupDate ? new Date(followupDate).toISOString() : null;
-        await updateLeadFollowup(lead.id, iso, notes || null);
-        setSavingFollowup(false);
     };
 
     const phone = lead.phone?.replace(/[^\d+]/g, '') || '';
@@ -273,47 +262,6 @@ export const LeadDetailPanel = ({ lead, onClose, onAgentStart, variant = 'modal'
                         )}
                     </div>
                 )}
-
-                {/* Takip & Not */}
-                <div className="px-5 pb-4">
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 px-1">
-                        Takip & Not
-                    </p>
-                    <div className="bg-gray-50 rounded-2xl p-4 space-y-3">
-                        {/* Date picker */}
-                        <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-purple-50 text-purple-500">
-                                <Bell className="w-4 h-4" />
-                            </div>
-                            <div className="flex-1">
-                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Takip Tarihi</p>
-                                <input
-                                    type="date"
-                                    value={followupDate}
-                                    onChange={e => setFollowupDate(e.target.value)}
-                                    className="w-full text-sm font-semibold text-gray-900 bg-white border border-gray-200 rounded-xl px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-purple-200"
-                                />
-                            </div>
-                        </div>
-                        {/* Notes textarea */}
-                        <textarea
-                            value={notes}
-                            onChange={e => setNotes(e.target.value)}
-                            placeholder="Not ekle... (görüşme özeti, sonraki adımlar)"
-                            rows={3}
-                            className="w-full text-sm text-gray-700 bg-white border border-gray-200 rounded-xl px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-purple-200 placeholder:text-gray-400"
-                        />
-                        {/* Save button */}
-                        <button
-                            onClick={handleSaveFollowup}
-                            disabled={savingFollowup}
-                            className="w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-gray-900 hover:bg-gray-800 text-white text-xs font-bold transition-colors disabled:opacity-50"
-                        >
-                            <Save className="w-3.5 h-3.5" />
-                            {savingFollowup ? 'Kaydediliyor...' : 'Kaydet'}
-                        </button>
-                    </div>
-                </div>
 
                 {/* Bottom padding */}
                 <div className="h-2" />
