@@ -1,12 +1,9 @@
 import { supabase } from '@/lib/supabase';
 
-const PROXY_BASE = "/api/n8n/webhook";
-const PROD_BASE = "https://n8n.vps.lueratech.com/webhook";
+// Her zaman same-origin proxy — dev'de Vite proxy, prod'da nginx proxy
+const N8N_WEBHOOK_BASE = "/api/n8n/webhook";
 
-const getN8nUrl = (endpoint: string) => {
-    const baseUrl = import.meta.env.DEV ? PROXY_BASE : PROD_BASE;
-    return `${baseUrl}/${endpoint}`;
-};
+const getN8nUrl = (endpoint: string) => `${N8N_WEBHOOK_BASE}/${endpoint}`;
 
 // Kullanıcının evolution_instance_name'ini Supabase'den çek
 const getUserInstanceName = async (userId: string): Promise<string> => {

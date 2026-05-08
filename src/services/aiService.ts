@@ -4,8 +4,8 @@
  * Field isimleri n8n node'undaki $json.body.* ile eşleşmeli.
  */
 
-const N8N_BASE = 'https://n8n.vps.lueratech.com';
-const AI_WEBHOOK_URL = `${N8N_BASE}/webhook/ai-message`;
+// Her zaman same-origin proxy üzerinden — CORS sorununu önler
+const AI_WEBHOOK_URL = '/api/n8n/webhook/ai-message';
 
 export const aiService = {
     async generateMessage(params: {
