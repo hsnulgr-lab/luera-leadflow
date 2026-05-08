@@ -94,7 +94,7 @@ export const n8nEvolutionService = {
         };
 
         try {
-            const response = await fetch(getN8nUrl(import.meta.env.VITE_N8N_AI_WEBHOOK || "whatsapp-ai-preview"), {
+            const response = await fetch(getN8nUrl("ai-message"), {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload)
