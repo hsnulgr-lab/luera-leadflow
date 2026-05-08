@@ -14,6 +14,7 @@ export const useEvolutionConnection = (instanceName: string | null) => {
     const [connectionState, setConnectionState] = useState<ConnectionState>('close');
     const [qrCode, setQrCode] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
+    const [connectError, setConnectError] = useState<string | null>(null);
 
     const wsRef = useRef<WebSocket | null>(null);
     const wsFailCount = useRef(0);
@@ -155,10 +156,16 @@ export const useEvolutionConnection = (instanceName: string | null) => {
         if (!instanceName) return;
         setIsLoading(true);
         setQrCode(null);
+        setConnectError(null);
 
         try {
             // 1. Instance yoksa oluştur
-            await evolutionService.ensureInstance(instanceName);
+            const ok = await evolutionService.ensureInstance(instanceName);
+            if (!ok && mountedRef.current) {
+                setConnectError('WhatsApp bağlantısı kurulamadı. Lütfen Ayarlar sayfasından instance adınızı kontrol edin veya destek ile iletişime geçin.');
+                setIsLoading(false);
+                return;
+            }
 
             // 2. QR kodunu HTTP ile al (yeni instance için retry'lı)
             const qr = await fetchQRWithRetry(instanceName);
@@ -166,11 +173,13 @@ export const useEvolutionConnection = (instanceName: string | null) => {
                 if (qr) {
                     setQrCode(qr);
                     setConnectionState('connecting');
-                    // QR 75s sonra süresi dolar
+                    setConnectError(null);
                     if (qrTimeoutRef.current) clearTimeout(qrTimeoutRef.current);
                     qrTimeoutRef.current = setTimeout(() => {
                         if (mountedRef.current) setQrCode(null);
                     }, 75000);
+                } else {
+                    setConnectError('QR kod alınamadı. WhatsApp instance\'ı henüz hazır değil olabilir. Lütfen birkaç saniye bekleyip tekrar deneyin.');
                 }
                 setIsLoading(false);
             }
@@ -185,6 +194,7 @@ export const useEvolutionConnection = (instanceName: string | null) => {
             console.error('[useEvolutionConnection] connect error:', err);
             if (mountedRef.current) {
                 setConnectionState('close');
+                setConnectError('Bağlantı kurulurken bir hata oluştu. Lütfen tekrar deneyin.');
                 setIsLoading(false);
             }
         }
@@ -230,6 +240,7 @@ export const useEvolutionConnection = (instanceName: string | null) => {
         isConnected: connectionState === 'open',
         qrCode,
         isLoading,
+        connectError,
         connect,
         disconnect,
         checkState,

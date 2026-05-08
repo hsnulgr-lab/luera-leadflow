@@ -70,6 +70,7 @@ const WhatsAppPage = () => {
         isConnected,
         qrCode,
         isLoading: isConnectionLoading,
+        connectError,
         connect: connectEvolution,
         disconnect: disconnectEvolution,
     } = useEvolutionConnection(INSTANCE_NAME);
@@ -336,6 +337,7 @@ const WhatsAppPage = () => {
                         qrCode={qrCode}
                         isQRModalOpen={isQRModalOpen}
                         isLoading={isConnectionLoading}
+                        connectError={connectError}
                         onConnect={handleConnect}
                         onDisconnect={disconnectEvolution}
                         onOpenChange={(open) => setIsQRModalOpen(open)}

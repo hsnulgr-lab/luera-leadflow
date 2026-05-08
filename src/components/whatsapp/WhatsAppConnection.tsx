@@ -1,6 +1,6 @@
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Loader2, Unplug, Smartphone, Wifi, CheckCircle2 } from "lucide-react";
+import { Loader2, Unplug, Smartphone, Wifi, CheckCircle2, AlertTriangle, RefreshCw } from "lucide-react";
 import { cn } from "@/utils/cn";
 
 interface WhatsAppConnectionProps {
@@ -8,6 +8,7 @@ interface WhatsAppConnectionProps {
     qrCode: string | null;
     isQRModalOpen: boolean;
     isLoading?: boolean;
+    connectError?: string | null;
     onConnect: () => void;
     onDisconnect?: () => void;
     onOpenChange: (open: boolean) => void;
@@ -18,6 +19,7 @@ export const WhatsAppConnection = ({
     qrCode,
     isQRModalOpen,
     isLoading = false,
+    connectError = null,
     onConnect,
     onDisconnect,
     onOpenChange,
@@ -147,6 +149,18 @@ export const WhatsAppConnection = ({
                                                     className="w-44 h-44 object-contain"
                                                 />
                                             </>
+                                        ) : connectError ? (
+                                            <div className="flex flex-col items-center gap-3 px-4 text-center">
+                                                <AlertTriangle className="w-8 h-8 text-amber-400" />
+                                                <p className="text-xs text-slate-500 leading-relaxed">{connectError}</p>
+                                                <button
+                                                    onClick={onConnect}
+                                                    className="flex items-center gap-1.5 text-xs font-semibold text-white bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-colors"
+                                                >
+                                                    <RefreshCw className="w-3 h-3" />
+                                                    Tekrar Dene
+                                                </button>
+                                            </div>
                                         ) : (
                                             <div className="flex flex-col items-center gap-3">
                                                 <div className="relative w-10 h-10">
