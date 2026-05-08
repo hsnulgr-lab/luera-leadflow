@@ -26,11 +26,12 @@ export const AIMessageDialog = ({ lead, open, onOpenChange }: AIMessageDialogPro
         try {
             const generatedMsg = await aiService.generateMessage({
                 leadName:    lead.name,
-                company:     lead.company,
-                sector:      lead.tags?.[0],
+                companyName: lead.company,
+                sector:      lead.tags?.[0] || lead.apolloSector,
+                address:     lead.address,
                 rating:      lead.rating ? parseFloat(String(lead.rating)) : null,
-                hasWebsite:  !!(lead.website && lead.website !== 'N/A'),
-                hasEmail:    !!(lead.email && lead.email.includes('@')),
+                website:     lead.website && lead.website !== 'N/A' ? lead.website : undefined,
+                instagram:   lead.instagram,
                 tone,
             });
             setMessage(generatedMsg);

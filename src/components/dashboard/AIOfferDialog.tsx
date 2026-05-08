@@ -39,10 +39,14 @@ export function AIOfferDialog({ lead, open, onOpenChange }: AIOfferDialogProps) 
         setLoading(true);
         try {
             const generatedMessage = await aiService.generateMessage({
-                leadName: lead.name,
-                company: lead.company,
-                sector: lead.tags?.[0],
-                tone: 'curious'
+                leadName:    lead.name,
+                companyName: lead.company,
+                sector:      lead.tags?.[0] || lead.apolloSector,
+                address:     lead.address,
+                rating:      lead.rating ? parseFloat(String(lead.rating)) : null,
+                website:     lead.website && lead.website !== 'N/A' ? lead.website : undefined,
+                instagram:   lead.instagram,
+                tone:        'curious',
             });
             setMessage(generatedMessage);
         } catch (error) {
