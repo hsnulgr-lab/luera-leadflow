@@ -23,7 +23,7 @@ export const evolutionService = {
             const res = await fetch(`${getBase()}/instance/create`, {
                 method: 'POST',
                 headers: headers(),
-                body: JSON.stringify({ instanceName, token: instanceName, qrcode: true }),
+                body: JSON.stringify({ instanceName, qrcode: true, integration: "WHATSAPP-BAILEYS" }),
             });
             return res.ok || res.status === 409; // 409 = zaten var
         } catch (err) {
