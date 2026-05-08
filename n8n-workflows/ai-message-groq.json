@@ -1,160 +1,160 @@
 {
-    "name": "AI Message Generator - Groq",
-    "nodes": [
-        {
-            "parameters": {
-                "httpMethod": "POST",
-                "path": "ai-message",
-                "responseMode": "responseNode",
-                "options": {
-                    "allowedOrigins": "*"
-                }
-            },
-            "id": "webhook",
-            "name": "Webhook",
-            "type": "n8n-nodes-base.webhook",
-            "typeVersion": 2,
-            "position": [
-                200,
-                300
-            ],
-            "webhookId": "ai-message-generator"
-        },
-        {
-            "parameters": {
-                "method": "POST",
-                "url": "https://api.groq.com/openai/v1/chat/completions",
-                "authentication": "genericCredentialType",
-                "genericAuthType": "httpHeaderAuth",
-                "sendHeaders": true,
-                "headerParameters": {
-                    "parameters": [
-                        {
-                            "name": "Content-Type",
-                            "value": "application/json"
-                        }
-                    ]
-                },
-                "sendBody": true,
-                "specifyBody": "json",
-                "jsonBody": "={\n  \"model\": \"llama-3.3-70b-versatile\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Sen bir profesyonel WhatsApp mesaj yazarısın. Türkçe yaz. Kısa, etkili ve ikna edici mesajlar oluştur. Emoji kullanabilirsin. Sadece mesaj metnini yaz, başka açıklama ekleme.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"{{ $json.prompt }}\"\n    }\n  ],\n  \"temperature\": 0.8,\n  \"max_tokens\": 500\n}",
-                "options": {}
-            },
-            "id": "groq-api",
-            "name": "Groq API",
-            "type": "n8n-nodes-base.httpRequest",
-            "typeVersion": 4.2,
-            "position": [
-                420,
-                300
-            ],
-            "credentials": {
-                "httpHeaderAuth": {
-                    "id": "groq-auth",
-                    "name": "Groq API Key"
-                }
+  "name": "AI Message Generator - Groq",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ai-message",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        200,
+        300
+      ],
+      "webhookId": "ai-message-generator"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
             }
+          ]
         },
-        {
-            "parameters": {
-                "jsCode": "// Extract message from Groq response\nconst groqResponse = $input.first().json;\n\nlet message = '';\n\nif (groqResponse.choices && groqResponse.choices[0] && groqResponse.choices[0].message) {\n  message = groqResponse.choices[0].message.content.trim();\n} else {\n  message = 'Mesaj oluşturulamadı. Lütfen tekrar deneyin.';\n}\n\nreturn {\n  json: {\n    message: message,\n    success: true\n  }\n};"
-            },
-            "id": "parse-response",
-            "name": "Parse Response",
-            "type": "n8n-nodes-base.code",
-            "typeVersion": 2,
-            "position": [
-                640,
-                300
-            ]
-        },
-        {
-            "parameters": {
-                "respondWith": "json",
-                "responseBody": "={{ $json }}",
-                "options": {
-                    "responseHeaders": {
-                        "entries": [
-                            {
-                                "name": "Access-Control-Allow-Origin",
-                                "value": "*"
-                            }
-                        ]
-                    }
-                }
-            },
-            "id": "respond",
-            "name": "Respond",
-            "type": "n8n-nodes-base.respondToWebhook",
-            "typeVersion": 1.1,
-            "position": [
-                860,
-                300
-            ]
-        },
-        {
-            "parameters": {
-                "jsCode": "// Build prompt from incoming data\nconst input = $input.first().json.body;\n\nconst leadName = input.leadName || 'Müşteri';\nconst company = input.company || 'Şirket';\nconst sector = input.sector || 'İşletme';\nconst tone = input.tone || 'professional';\n\nconst toneInstructions = {\n  professional: 'Profesyonel ve resmi bir dil kullan. Saygılı ve işe odaklı ol.',\n  friendly: 'Samimi ve sıcak bir dil kullan. Dostça ama profesyonellik sınırlarını aşma.',\n  sales: 'İkna edici ve değer odaklı bir dil kullan. Acil fırsatlar ve özel teklifler vurgula.',\n  offer: 'Bu işletmeyi analiz et ve 3 maddelik büyüme stratejisi öner.'\n};\n\nconst prompt = `Bir işletmeye WhatsApp üzerinden lead mesajı yaz.\n\nLead Bilgileri:\n- İsim: ${leadName}\n- Şirket: ${company}\n- Sektör: ${sector}\n\nTon: ${tone}\n${toneInstructions[tone] || toneInstructions.professional}\n\nKurallar:\n1. Şablon kullanma, her mesaj firmaya özel olsun\n2. Sektöre özel terminoloji kullan\n3. 80-120 kelime arası olsun\n4. Selamla başla, soru ile bitir\n5. Gerçekçi ve samimi ol`;\n\nreturn {\n  json: {\n    prompt: prompt\n  }\n};"
-            },
-            "id": "build-prompt",
-            "name": "Build Prompt",
-            "type": "n8n-nodes-base.code",
-            "typeVersion": 2,
-            "position": [
-                200,
-                300
-            ]
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-3.3-70b-versatile\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"{{ $json.systemPrompt }}\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"{{ $json.userPrompt }}\"\n    }\n  ],\n  \"temperature\": 0.85,\n  \"max_tokens\": 300\n}",
+        "options": {}
+      },
+      "id": "groq-api",
+      "name": "Groq API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        420,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "groq-auth",
+          "name": "Groq API Key"
         }
-    ],
-    "connections": {
-        "Webhook": {
-            "main": [
-                [
-                    {
-                        "node": "Build Prompt",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract message from Groq response\nconst groqResponse = $input.first().json;\n\nlet message = '';\n\nif (groqResponse.choices && groqResponse.choices[0] && groqResponse.choices[0].message) {\n  message = groqResponse.choices[0].message.content.trim();\n} else {\n  message = 'Mesaj oluşturulamadı. Lütfen tekrar deneyin.';\n}\n\nreturn {\n  json: {\n    message: message,\n    success: true\n  }\n};"
+      },
+      "id": "parse-response",
+      "name": "Parse Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
             ]
-        },
-        "Build Prompt": {
-            "main": [
-                [
-                    {
-                        "node": "Groq API",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
-        },
-        "Groq API": {
-            "main": [
-                [
-                    {
-                        "node": "Parse Response",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
-        },
-        "Parse Response": {
-            "main": [
-                [
-                    {
-                        "node": "Respond",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
+          }
         }
+      },
+      "id": "respond",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        860,
+        300
+      ]
     },
-    "settings": {
-        "executionOrder": "v1"
+    {
+      "parameters": {
+        "jsCode": "// Build personalized outreach prompt\nconst input = $input.first().json.body;\n\nconst leadName    = input.leadName    || 'Merhaba';\nconst company     = input.company     || 'işletmeniz';\nconst sector      = input.sector      || 'İşletme';\nconst rating      = input.rating;\nconst hasWebsite  = input.hasWebsite;\nconst hasEmail    = input.hasEmail;\nconst tone        = input.tone        || 'professional';\nconst businessName   = input.businessName   || '';\nconst businessOffer  = input.businessOffer  || '';\n\n// Sektöre göre içgörü ipuçları\nconst sectorInsights = {\n  'Kafe':             'Kafe işletmelerinin %78\\'i yeni müşterilerini Google Haritalar üzerinden buluyor.',\n  'Restoran':         'Restoran rezervasyonlarının %65\\'i artık mobil üzerinden geliyor.',\n  'Diş':              'Diş kliniklerinde online randevu sistemi olan yerler %3 daha fazla hasta görüyor.',\n  'Kuaför':           'Kuaför salonlarında Instagram takipçisi olan yerler doluluk oranını %40 artırıyor.',\n  'Güzellik':         'Güzellik merkezlerinde Google yorumları randevu kararlarını %90 etkiliyor.',\n  'Veteriner':        'Veteriner klinikleri için online görünürlük yeni hasta kazanımını 2.5x artırıyor.',\n  'Spor':             'Spor tesislerinde dijital üyelik sistemi churn oranını %35 düşürüyor.',\n  'Eğitim':           'Eğitim kurumlarında WhatsApp ile iletişim kayıt dönüşümünü %60 artırıyor.',\n};\n\n// Rating bazlı kişiselleştirme\nlet ratingInsight = '';\nif (rating >= 4.5) {\n  ratingInsight = `Google'da ${rating} puanla sektörün en iyileri arasındasınız`;\n} else if (rating >= 4.0) {\n  ratingInsight = `${rating} puanlık Google skorunuzu 4.8'in üzerine çıkarmak`;\n} else if (rating > 0) {\n  ratingInsight = `Google puanınızı rakiplerinizin önüne geçirecek bir strateji`;\n} else {\n  ratingInsight = `${company} için özel hazırladığımız büyüme analizi`;\n}\n\n// Website durumu\nconst websiteNote = hasWebsite\n  ? 'Web sitenizi inceledim ve potansiyelini gördüm.'\n  : 'Web sitesi olmayan işletmelerin kaçırdığı fırsatları somut rakamlarla görebilirsiniz.';\n\n// Ton ayarları\nconst toneGuide = {\n  professional: 'Güven veren, ölçülü profesyonel bir ton kullan. Rakam ve somut veri kullan.',\n  friendly:     'Sıcak, samimi ama saygılı bir ton kullan. Sanki tanıdık biri gibi yaz.',\n  curious:      'Merak uyandır ama cevabı verme. Karşı tarafın \"nasıl?\" diye sormasını sağla.',\n};\n\nconst sectorHint = sectorInsights[sector] || `${sector} sektöründe öne çıkan işletmelerin ortak bir sırrı var.`;\n\nconst systemPrompt = `Sen Türkiye'deki yerel işletmelere yönelik WhatsApp outreach konusunda uzman bir satış copywriter'sın. \nYazdığın mesajlar taciz gibi değil, gerçekten yardım etmek isteyen biri gibi hissettirmeli.`;\n\nconst userPrompt = `Aşağıdaki işletme için WhatsApp'ta ilk temas mesajı yaz:\n\nİşletme: ${company}\nYetkili: ${leadName}\nSektör: ${sector}\n${rating ? `Google Puanı: ${rating}/5` : ''}\n${hasWebsite !== undefined ? `Web Sitesi: ${hasWebsite ? 'Var' : 'Yok'}` : ''}\n${businessName ? `Gönderen: ${businessName}` : ''}\n${businessOffer ? `Sunulan hizmet: ${businessOffer}` : ''}\n\nMESAJ YAPISI (3 element, bu sırayla):\n1. SELAMLAma + KİŞİSELLEŞTİRME: İsimle selamla, işletmelerine özel bir gözlem yap (rating veya sektör gerçeğini kullan: \"${ratingInsight}\")\n2. MERAK ARALIĞI: Sektör içgörüsüyle merak uyandır, ama çözümü açıklama → \"${sectorHint}\"\n3. TEK SORU: Satışa değil, bir sonraki küçük adıma yönlendiren yumuşak bir soru\n\nTON: ${toneGuide[tone] || toneGuide.professional}\n\nKURALLAR:\n- Maksimum 3 cümle, 70-90 kelime\n- \"Teklif\", \"satış\", \"pazarlama\", \"reklam\" kelimelerini KULLANMA\n- Emoji: sadece 1-2 tane, doğal yerlerde\n- Kalıp cümleler kullanma, bu mesaj sadece ${company}'e yazılmış gibi hissettirmeli\n- Türkçe, sade ve akıcı yaz\n- Mesaj spam gibi görünmemeli — meraklı biri gibi hissettirmeli`;\n\nreturn {\n  json: {\n    systemPrompt,\n    userPrompt\n  }\n};"
+      },
+      "id": "build-prompt",
+      "name": "Build Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        200,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Build Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
-    "staticData": null,
-    "active": false
+    "Build Prompt": {
+      "main": [
+        [
+          {
+            "node": "Groq API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq API": {
+      "main": [
+        [
+          {
+            "node": "Parse Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Response": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "active": false
 }

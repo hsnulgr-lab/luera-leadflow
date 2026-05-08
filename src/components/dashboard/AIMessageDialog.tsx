@@ -17,7 +17,7 @@ interface AIMessageDialogProps {
 export const AIMessageDialog = ({ lead, open, onOpenChange }: AIMessageDialogProps) => {
     const [message, setMessage] = useState("");
     const [isGenerating, setIsGenerating] = useState(false);
-    const [tone, setTone] = useState<'professional' | 'friendly' | 'urgent'>('professional');
+    const [tone, setTone] = useState<'professional' | 'friendly' | 'curious'>('professional');
 
     const handleGenerate = async () => {
         if (!lead) return;
@@ -25,10 +25,13 @@ export const AIMessageDialog = ({ lead, open, onOpenChange }: AIMessageDialogPro
         setIsGenerating(true);
         try {
             const generatedMsg = await aiService.generateMessage({
-                leadName: lead.name,
-                company: lead.company,
-                sector: lead.tags?.[0], // Assuming first tag is sector or using undefined
-                tone: tone
+                leadName:    lead.name,
+                company:     lead.company,
+                sector:      lead.tags?.[0],
+                rating:      lead.rating ? parseFloat(String(lead.rating)) : null,
+                hasWebsite:  !!(lead.website && lead.website !== 'N/A'),
+                hasEmail:    !!(lead.email && lead.email.includes('@')),
+                tone,
             });
             setMessage(generatedMsg);
         } catch (error) {
@@ -63,15 +66,18 @@ export const AIMessageDialog = ({ lead, open, onOpenChange }: AIMessageDialogPro
 
                 <div className="space-y-4 py-4">
                     <div className="flex gap-2">
-                        {(['professional', 'friendly', 'urgent'] as const).map((t) => (
+                        {([
+                            { value: 'professional', label: '🤝 Profesyonel' },
+                            { value: 'friendly',     label: '😊 Samimi'      },
+                            { value: 'curious',      label: '🎯 Merak Uyandır' },
+                        ] as const).map((t) => (
                             <Button
-                                key={t}
-                                variant={tone === t ? "default" : "outline"}
+                                key={t.value}
+                                variant={tone === t.value ? "default" : "outline"}
                                 size="sm"
-                                onClick={() => setTone(t)}
-                                className="capitalize"
+                                onClick={() => setTone(t.value)}
                             >
-                                {t === 'professional' ? 'Profesyonel' : t === 'friendly' ? 'Samimi' : 'Acil'}
+                                {t.label}
                             </Button>
                         ))}
                     </div>

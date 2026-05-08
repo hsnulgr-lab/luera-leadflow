@@ -1,32 +1,32 @@
 /**
- * AI Service — Backend Proxy Versiyonu
+ * AI Service — n8n Groq Webhook
  *
- * API key'ler artık Railway bridge server'da (server-side).
- * Client sadece /api/ai/generate endpoint'ine POST atar.
- * Dev'de Vite proxy üzerinden, prod'da Railway URL üzerinden.
+ * n8n/webhook/ai-message → Groq LLM → kişiselleştirilmiş mesaj
  */
 
-const AI_PROXY_URL = import.meta.env.DEV
-    ? '/api/bridge/ai/generate'   // Vite proxy → localhost:3001/api/ai/generate
-    : '/api/ai/generate';         // Production: same-origin via Railway
+const N8N_BASE = 'https://n8n.vps.lueratech.com';
+const AI_WEBHOOK_URL = `${N8N_BASE}/webhook/ai-message`;
 
 export const aiService = {
     async generateMessage(params: {
         leadName:        string;
         company:         string;
         sector?:         string;
-        tone?:           'professional' | 'friendly' | 'urgent' | 'offer';
+        rating?:         number | null;
+        hasWebsite?:     boolean;
+        hasEmail?:       boolean;
+        tone?:           'professional' | 'friendly' | 'curious';
         businessName?:   string;
         businessSector?: string;
         businessOffer?:  string;
         senderName?:     string;
     }): Promise<string> {
         try {
-            const res = await fetch(AI_PROXY_URL, {
+            const res = await fetch(AI_WEBHOOK_URL, {
                 method:  'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body:    JSON.stringify(params),
-                signal:  AbortSignal.timeout(15_000),
+                signal:  AbortSignal.timeout(20_000),
             });
 
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -36,9 +36,9 @@ export const aiService = {
             throw new Error('Empty response');
 
         } catch (error) {
-            console.warn('[aiService] Proxy failed, using fallback:', error);
-            // Statik fallback — bridge server ulaşılamazsa kullanılır
-            return `Merhaba ${params.leadName}, ${params.company} işletmesi için özel bir teklifimiz var. Müsait olduğunuzda görüşebilir miyiz?`;
+            console.warn('[aiService] n8n failed, using fallback:', error);
+            const name = params.leadName || params.company;
+            return `Merhaba ${name} 👋 ${params.company} hakkında kısa bir bilgi paylaşmak istedim — sizin için hazırladığımız analizi 2 dakikada anlatabilir miyim?`;
         }
     },
 };

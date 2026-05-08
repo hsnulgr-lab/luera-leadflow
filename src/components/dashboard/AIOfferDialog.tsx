@@ -42,7 +42,7 @@ export function AIOfferDialog({ lead, open, onOpenChange }: AIOfferDialogProps) 
                 leadName: lead.name,
                 company: lead.company,
                 sector: lead.tags?.[0],
-                tone: 'offer'
+                tone: 'curious'
             });
             setMessage(generatedMessage);
         } catch (error) {
