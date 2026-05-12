@@ -3,22 +3,8 @@ import { ScheduleConfig, Lead } from "@/types/lead";
 const WEBHOOK_ID = "e3c9c128-2078-4702-8fc2-bf55da50302c";
 const PROXY_PATH = `/api/n8n/webhook/${WEBHOOK_ID}`;
 
-// Production'da CallFlow Bridge Server'ın n8n proxy endpoint'i kullanılır
-// (CORS sorununu çözer)
-const BRIDGE_URL =
-    (import.meta.env.VITE_CALLFLOW_API_URL as string) ||
-    "https://callflow-production-3ce4.up.railway.app";
-
-// Helper to get the correct URL
-const getApiUrl = (_key: "search" | "agent") => {
-    // Development: Vite proxy üzerinden
-    if (import.meta.env.DEV) {
-        return PROXY_PATH;
-    }
-
-    // Production: Bridge server üzerinden proxy (CORS uyumlu)
-    return `${BRIDGE_URL}/api/n8n/webhook/${WEBHOOK_ID}`;
-};
+// Her zaman same-origin proxy — dev'de Vite, prod'da nginx
+const getApiUrl = (_key: "search" | "agent") => PROXY_PATH;
 
 
 
@@ -118,9 +104,7 @@ export const n8nService = {
     },
 
     async generateAnalyzedMessage(lead: Lead): Promise<string> {
-        // Default to the user's provided URL if not set
-        const defaultAgentUrl = "https://callflow-production-3ce4.up.railway.app/api/n8n/webhook/lead-agent";
-        const apiUrl = getApiUrl("agent") || defaultAgentUrl;
+        const apiUrl = getApiUrl("agent");
 
         if (!apiUrl) {
             throw new Error("Webhook URL config is missing.");
@@ -197,7 +181,7 @@ export const n8nService = {
         companyCategory?: string
     ): Promise<{ success: boolean; messageId?: string; error?: string }> {
         const webhookUrl = localStorage.getItem("n8n_whatsapp_single_url")
-            || "https://callflow-production-3ce4.up.railway.app/api/n8n/webhook/whatsapp-send-single";
+            || "/api/n8n/webhook/whatsapp-send-single";
 
         try {
             const response = await fetch(webhookUrl, {
@@ -248,7 +232,7 @@ export const n8nService = {
         results: Array<{ phone: string; success: boolean; error?: string }>;
     }> {
         const webhookUrl = localStorage.getItem("n8n_whatsapp_bulk_url")
-            || "https://callflow-production-3ce4.up.railway.app/api/n8n/webhook/whatsapp-send-bulk";
+            || "/api/n8n/webhook/whatsapp-send-bulk";
 
         try {
             const response = await fetch(webhookUrl, {
