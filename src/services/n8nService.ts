@@ -1,24 +1,9 @@
 import { ScheduleConfig, Lead } from "@/types/lead";
 
 const WEBHOOK_ID = "e3c9c128-2078-4702-8fc2-bf55da50302c";
-const PROXY_PATH = `/api/n8n/webhook/${WEBHOOK_ID}`;
 
-// Production'da CallFlow Bridge Server'ın n8n proxy endpoint'i kullanılır
-// (CORS sorununu çözer)
-const BRIDGE_URL =
-    (import.meta.env.VITE_CALLFLOW_API_URL as string) ||
-    "https://callflow-production-3ce4.up.railway.app";
-
-// Helper to get the correct URL
-const getApiUrl = (_key: "search" | "agent") => {
-    // Development: Vite proxy üzerinden
-    if (import.meta.env.DEV) {
-        return PROXY_PATH;
-    }
-
-    // Production: Bridge server üzerinden proxy (CORS uyumlu)
-    return `${BRIDGE_URL}/api/n8n/webhook/${WEBHOOK_ID}`;
-};
+// Her ortamda (dev/prod) nginx veya Vite proxy üzerinden same-origin çağrı
+const getApiUrl = (_key: "search" | "agent") => `/api/n8n/webhook/${WEBHOOK_ID}`;
 
 
 
@@ -118,28 +103,20 @@ export const n8nService = {
     },
 
     async generateAnalyzedMessage(lead: Lead): Promise<string> {
-        // Default to the user's provided URL if not set
-        const defaultAgentUrl = "https://callflow-production-3ce4.up.railway.app/api/n8n/webhook/lead-agent";
-        const apiUrl = getApiUrl("agent") || defaultAgentUrl;
+        const apiUrl = "/api/n8n/webhook/ai-message";
 
         if (!apiUrl) {
             throw new Error("Webhook URL config is missing.");
         }
 
         const payload = {
-            action: "analyze_and_generate",
-            leadId: lead.id,
-            name: lead.name,
-            company: lead.company,
-            phone: lead.phone,
-            email: lead.email,
-            website: lead.website,
-            timestamp: new Date().toISOString()
+            companyName: lead.company,
+            sector:      lead.company,
+            website:     lead.website,
+            address:     lead.address,
+            rating:      lead.rating,
+            instagram:   lead.instagram,
         };
-
-        if (!payload.website) {
-            throw new Error("Analiz için müşterinin web sitesi gereklidir.");
-        }
 
         try {
             const response = await fetch(apiUrl, {
@@ -197,7 +174,7 @@ export const n8nService = {
         companyCategory?: string
     ): Promise<{ success: boolean; messageId?: string; error?: string }> {
         const webhookUrl = localStorage.getItem("n8n_whatsapp_single_url")
-            || "https://callflow-production-3ce4.up.railway.app/api/n8n/webhook/whatsapp-send-single";
+            || "/api/n8n/webhook/whatsapp-bulk-v19";
 
         try {
             const response = await fetch(webhookUrl, {
@@ -248,7 +225,7 @@ export const n8nService = {
         results: Array<{ phone: string; success: boolean; error?: string }>;
     }> {
         const webhookUrl = localStorage.getItem("n8n_whatsapp_bulk_url")
-            || "https://callflow-production-3ce4.up.railway.app/api/n8n/webhook/whatsapp-send-bulk";
+            || "/api/n8n/webhook/whatsapp-bulk-v19";
 
         try {
             const response = await fetch(webhookUrl, {
