@@ -1,7 +1,10 @@
-import { X, Mail, Phone, Globe, MapPin, Star, Users, Linkedin, Instagram, Building, Tag, Trash2, MessageCircle, PhoneCall, ExternalLink } from "lucide-react";
+import { useState } from "react";
+import { X, Mail, Phone, Globe, MapPin, Star, Users, Linkedin, Instagram, Building, Tag, Trash2, MessageCircle, PhoneCall, ExternalLink, CalendarPlus } from "lucide-react";
 import { Lead } from "@/types/lead";
 import { cn } from "@/utils/cn";
 import { useLeads } from "@/hooks/useLeads";
+import { isTimeflowConnected } from "@/services/timeflowService";
+import { CreateAppointmentModal } from "./CreateAppointmentModal";
 
 interface LeadDetailPanelProps {
     lead: Lead | null;
@@ -18,6 +21,8 @@ const getInitials = (name: string) =>
 
 export const LeadDetailPanel = ({ lead, onClose, onAgentStart, variant = 'modal' }: LeadDetailPanelProps) => {
     const { deleteLead } = useLeads();
+    const [appointmentOpen, setAppointmentOpen] = useState(false);
+    const timeflowConnected = isTimeflowConnected();
 
     if (!lead) return null;
 
@@ -103,7 +108,7 @@ export const LeadDetailPanel = ({ lead, onClose, onAgentStart, variant = 'modal'
             </div>
 
             {/* ── QUICK ACTIONS ───────────────────────────────────── */}
-            <div className="grid grid-cols-4 gap-0 border-b border-gray-100">
+            <div className="grid grid-cols-5 gap-0 border-b border-gray-100">
                 {[
                     { label: 'WhatsApp', icon: MessageCircle, url: waUrl,   bg: 'hover:bg-[#25D366]/8', icon_color: waUrl   ? 'text-[#25D366]' : 'text-gray-300' },
                     { label: 'Ara',      icon: PhoneCall,     url: callUrl, bg: 'hover:bg-gray-50',      icon_color: callUrl ? 'text-gray-900' : 'text-gray-300' },
@@ -115,8 +120,7 @@ export const LeadDetailPanel = ({ lead, onClose, onAgentStart, variant = 'modal'
                         disabled={!url}
                         onClick={() => url && window.open(url, '_blank')}
                         className={cn(
-                            "flex flex-col items-center justify-center gap-1.5 py-4 transition-colors",
-                            i < 3 && "border-r border-gray-100",
+                            "flex flex-col items-center justify-center gap-1.5 py-4 transition-colors border-r border-gray-100",
                             url ? cn(bg, "cursor-pointer") : "cursor-not-allowed opacity-40"
                         )}
                     >
@@ -126,7 +130,27 @@ export const LeadDetailPanel = ({ lead, onClose, onAgentStart, variant = 'modal'
                         </span>
                     </button>
                 ))}
+
+                {/* Randevu Oluştur — TimeFlow bağlıysa aktif */}
+                <button
+                    onClick={() => timeflowConnected && setAppointmentOpen(true)}
+                    disabled={!timeflowConnected}
+                    title={timeflowConnected ? 'TimeFlow randevusu oluştur' : 'TimeFlow paketi gerekli'}
+                    className={cn(
+                        "flex flex-col items-center justify-center gap-1.5 py-4 transition-colors",
+                        timeflowConnected ? "hover:bg-[#CCFF00]/10 cursor-pointer" : "cursor-not-allowed opacity-40"
+                    )}
+                >
+                    <CalendarPlus className={cn("w-5 h-5", timeflowConnected ? "text-[#84cc16]" : "text-gray-300")} strokeWidth={1.8} />
+                    <span className={cn("text-[10px] font-semibold", timeflowConnected ? "text-gray-600" : "text-gray-300")}>
+                        Randevu
+                    </span>
+                </button>
             </div>
+
+            {appointmentOpen && (
+                <CreateAppointmentModal lead={lead} onClose={() => setAppointmentOpen(false)} />
+            )}
 
             {/* ── SCROLLABLE BODY ─────────────────────────────────── */}
             <div className="flex-1 overflow-y-auto no-scrollbar">

@@ -185,6 +185,12 @@ export const SettingsPage = () => {
                 localStorage.removeItem("callflow_api_key");
             }
 
+            if (draft.timeflowApiKey) {
+                localStorage.setItem("timeflow_api_key", draft.timeflowApiKey);
+            } else {
+                localStorage.removeItem("timeflow_api_key");
+            }
+
             setSaved({ ...draft });
             setSuccess(true);
             setTimeout(() => setSuccess(false), 3000);
