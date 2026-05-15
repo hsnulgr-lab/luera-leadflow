@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { User, Globe, Save, CheckCircle2, MessageSquare, Radio, Building2, Instagram, Link, Sparkles, Info } from "lucide-react";
+import { User, Globe, Save, CheckCircle2, MessageSquare, Radio, Building2, Instagram, Link, Sparkles, Info, Clock, Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 
 interface SettingsData {
     evolutionInstance: string;
     callflowApiKey: string;
+    timeflowApiKey: string;
     businessName: string;
     businessSector: string;
     businessOffer: string;
@@ -18,6 +19,7 @@ interface SettingsData {
 const DEFAULT_DATA: SettingsData = {
     evolutionInstance: "",
     callflowApiKey: "",
+    timeflowApiKey: "",
     businessName: "",
     businessSector: "",
     businessOffer: "",
@@ -25,6 +27,76 @@ const DEFAULT_DATA: SettingsData = {
     businessWebsite: "",
     businessInstagram: "",
 };
+
+function TimeflowIntegrationCard({ apiKey, onChange }: { apiKey: string; onChange: (v: string) => void }) {
+    const [testing, setTesting] = useState(false);
+    const [testResult, setTestResult] = useState<boolean | null>(null);
+
+    const handleTest = async () => {
+        if (!apiKey) return;
+        setTesting(true);
+        setTestResult(null);
+        try {
+            const res = await fetch('https://n8n.vps.lueratech.com/webhook/gateway/v1/event', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+                body: JSON.stringify({ event_type: 'ping', source_module: 'leadflow' }),
+            });
+            setTestResult(res.ok || res.status === 400 || res.status === 422);
+        } catch {
+            setTestResult(false);
+        } finally {
+            setTesting(false);
+        }
+    };
+
+    return (
+        <div className={`rounded-2xl border-2 p-5 transition-colors ${apiKey ? "border-[#CCFF00]/60 bg-[#CCFF00]/5" : "border-border bg-background/50"}`}>
+            <div className="flex items-start gap-3 mb-4">
+                <div className="w-9 h-9 rounded-xl bg-slate-900 flex items-center justify-center flex-shrink-0">
+                    <Clock className="w-4 h-4 text-[#CCFF00]" />
+                </div>
+                <div className="flex-1">
+                    <p className="font-semibold text-gray-900">LUERA TimeFlow</p>
+                    <p className="text-xs text-muted-foreground">Randevu oluşturma ve yönetim sistemi.</p>
+                </div>
+                {apiKey && (
+                    <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-full">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                        Bağlı
+                    </span>
+                )}
+            </div>
+            <div>
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">Bağlantı Anahtarı</label>
+                <p className="text-xs text-muted-foreground mb-2">TimeFlow → Ayarlar → Entegrasyonlar sayfasından kopyala.</p>
+                <input
+                    type="text"
+                    value={apiKey}
+                    onChange={(e) => { onChange(e.target.value); setTestResult(null); }}
+                    placeholder="TimeFlow API key yapıştır..."
+                    className="w-full px-4 py-3 rounded-xl border border-border bg-white font-mono text-sm focus:ring-2 focus:ring-[#CCFF00]/30 focus:border-[#CCFF00]/50 outline-none"
+                />
+                <div className="flex items-center gap-2 mt-2">
+                    <button
+                        type="button"
+                        onClick={handleTest}
+                        disabled={testing || !apiKey}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs font-semibold text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-40"
+                    >
+                        {testing ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                        {testing ? 'Test ediliyor...' : 'Bağlantıyı Test Et'}
+                    </button>
+                    {testResult !== null && (
+                        <span className={`text-xs font-medium ${testResult ? 'text-emerald-600' : 'text-red-500'}`}>
+                            {testResult ? '✓ Bağlantı başarılı' : '✗ Bağlantı kurulamadı'}
+                        </span>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
 
 export const SettingsPage = () => {
     const { user } = useAuth();
@@ -56,6 +128,7 @@ export const SettingsPage = () => {
                 const loaded: SettingsData = {
                     evolutionInstance: data.evolution_instance_name || "",
                     callflowApiKey: data.callflow_api_key || "",
+                    timeflowApiKey: data.timeflow_api_key || "",
                     businessName: data.business_name || "",
                     businessSector: data.business_sector || "",
                     businessOffer: data.business_offer || "",
@@ -90,6 +163,7 @@ export const SettingsPage = () => {
                     user_id: user.id,
                     evolution_instance_name: draft.evolutionInstance || null,
                     callflow_api_key: draft.callflowApiKey || null,
+                    timeflow_api_key: draft.timeflowApiKey || null,
                     business_name: draft.businessName || null,
                     business_sector: draft.businessSector || null,
                     business_offer: draft.businessOffer || null,
@@ -124,6 +198,7 @@ export const SettingsPage = () => {
     const handleCancel = () => {
         setDraft({ ...saved });
     };
+
 
     const update = (field: keyof SettingsData, value: string) => {
         setDraft(prev => ({ ...prev, [field]: value }));
@@ -360,6 +435,12 @@ export const SettingsPage = () => {
                                         />
                                     </div>
                                 </div>
+
+                                {/* LUERA TimeFlow */}
+                                <TimeflowIntegrationCard
+                                    apiKey={draft.timeflowApiKey}
+                                    onChange={(v) => update("timeflowApiKey", v)}
+                                />
 
                                 {/* WhatsApp */}
                                 <div className="rounded-2xl border border-border bg-background/50 p-5">
