@@ -9,17 +9,28 @@ export interface AppointmentPayload {
     notes?: string;
 }
 
+function parseConnectionString(raw: string): { apiKey: string; userId: string } {
+    const parts = raw.split('|');
+    return { apiKey: parts[0] ?? '', userId: parts[1] ?? '' };
+}
+
 export function getTimeflowApiKey(): string | null {
     return localStorage.getItem('timeflow_api_key');
 }
 
 export function isTimeflowConnected(): boolean {
-    return !!getTimeflowApiKey();
+    const raw = getTimeflowApiKey();
+    if (!raw) return false;
+    const { apiKey, userId } = parseConnectionString(raw);
+    return !!(apiKey && userId);
 }
 
 export async function createTimeflowAppointment(payload: AppointmentPayload): Promise<{ success: boolean; error?: string }> {
-    const apiKey = getTimeflowApiKey();
-    if (!apiKey) return { success: false, error: 'TimeFlow bağlı değil' };
+    const raw = getTimeflowApiKey();
+    if (!raw) return { success: false, error: 'TimeFlow bağlı değil' };
+
+    const { apiKey, userId } = parseConnectionString(raw);
+    if (!userId) return { success: false, error: 'TimeFlow bağlantı anahtarı geçersiz — yeniden kopyalayın' };
 
     const TIMEFLOW_GATEWAY = 'https://supabase.timeflow.lueratech.com/functions/v1/gateway';
 
@@ -33,6 +44,7 @@ export async function createTimeflowAppointment(payload: AppointmentPayload): Pr
             body: JSON.stringify({
                 event_type: 'appointment.create',
                 source_module: 'leadflow',
+                user_id: userId,
                 ...payload,
             }),
         });
